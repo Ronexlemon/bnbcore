@@ -18,7 +18,7 @@ CREATE TABLE users (
     email TEXT NOT NULL,
     password_hash TEXT NOT NULL,
 
-    role user_role DEFAULT 'staff',
+    role user_role DEFAULT 'owner',
 
     is_active BOOLEAN DEFAULT true,
 
