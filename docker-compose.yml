@@ -1,0 +1,98 @@
+version: "3.9"
+
+services:
+
+  # =========================
+  # POSTGRES DATABASE
+  # =========================
+  db:
+    image: postgres:16
+    container_name: bnbcore_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: lemon
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # =========================
+  # REDIS (CACHE / SESSIONS)
+  # =========================
+  redis:
+    image: redis:7-alpine
+    container_name: bnbcore_redis
+    restart: always
+    ports:
+      - "6379:6379"
+    command: ["redis-server", "--appendonly", "yes"]
+
+  # =========================
+  # KAFKA-LIKE EVENT STREAM (REDPANDA)
+  # =========================
+  redpanda:
+    image: redpandadata/redpanda:latest
+    container_name: bnbcore_redpanda
+    restart: always
+    command:
+      - redpanda
+      - start
+      - --overprovisioned
+      - --smp
+      - "1"
+      - --memory
+      - "1G"
+      - --reserve-memory
+      - "0M"
+      - --node-id
+      - "0"
+      - --check=false
+    ports:
+      - "9092:9092"
+      - "9644:9644"
+
+  # =========================
+  # MIGRATIONS RUNNER
+  # =========================
+  migrate:
+    image: migrate/migrate
+    container_name: bnbcore_migrate
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./internal/infrastructure/db/migrations:/migrations:ro
+    command: -path=/migrations -database "postgres://postgres:postgres@db:5432/lemon?sslmode=disable" up
+
+  # =========================
+  # GO API SERVICE
+  # =========================
+  api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: bnbcore_api
+    restart: always
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      redpanda:
+        condition: service_started
+      migrate:
+        condition: service_completed_successfully
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
+
+volumes:
+  pgdata:
