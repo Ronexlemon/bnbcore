@@ -1,0 +1,48 @@
+
+
+CREATE TYPE tenant_status AS ENUM (
+    'trial',
+    'active',
+    'expired',
+    'suspended'
+);
+
+-- =========================
+-- PLATFORM ADMINS 
+-- =========================
+
+CREATE TABLE platform_users (
+    id UUID PRIMARY KEY,
+    email TEXT UNIQUE NOT NULL,
+    password_hash TEXT NOT NULL,
+    role TEXT NOT NULL, -- super_admin | billing_admin | support
+    created_at TIMESTAMP DEFAULT now()
+);
+
+-- =========================
+-- PLATFORM SETTINGS
+-- =========================
+
+CREATE TABLE platform_settings (
+    id UUID PRIMARY KEY,
+    key TEXT UNIQUE NOT NULL,
+    value TEXT NOT NULL,
+    updated_by UUID REFERENCES platform_users(id),
+    updated_at TIMESTAMP DEFAULT now()
+);
+
+-- =========================
+-- TENANTS (SHOPS)
+-- =========================
+
+CREATE TABLE tenants (
+    id UUID PRIMARY KEY,
+    name TEXT NOT NULL,
+    subdomain TEXT UNIQUE NOT NULL,
+
+    status tenant_status DEFAULT 'trial',
+
+    trial_ends_at TIMESTAMP NOT NULL,
+
+    created_at TIMESTAMP DEFAULT now()
+);
