@@ -1,4 +1,4 @@
-package jwt
+package auth
 
 import (
 	"errors"
@@ -65,8 +65,8 @@ func (m *JwtManager) generateToken(userId,email,role string,duration time.Durati
 			NotBefore: jwt.NewNumericDate(now),
 		},
 	}
-	token:=jwt.NewWithClaims(jwt.SigningMethodES256,claims)
-	return token.SignedString(m.secret)
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims) 
+return token.SignedString(m.secret)
 
 }
 

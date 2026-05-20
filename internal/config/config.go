@@ -1,23 +1,44 @@
 package config
 
-import "os"
+import (
+	"os"
+	"strconv"
+)
 
 type Config struct {
-	DBHost     string
-	DBPort     string
-	DBUser     string
-	DBPassword string
-	DBName     string
-	DBSSLMode  string
+	DBHost                     string
+	DBPort                     string
+	DBUser                     string
+	DBPassword                 string
+	DBName                     string
+	DBSSLMode                  string
+	JWT_SECRET                 string
+	JWT_REFRESH_DURATION_HOUR  int 
+	JWT_ACCESS_DURATION_MINUTE int 
 }
 
 func Load() *Config {
+
+	accessMin, err := strconv.Atoi(os.Getenv("JWT_ACCESS_DURATION_MINUTE"))
+	if err != nil {
+		accessMin = 15 
+	}
+
+	
+	refreshHour, err := strconv.Atoi(os.Getenv("JWT_REFRESH_DURATION_HOUR"))
+	if err != nil {
+		refreshHour = 7 
+	}
+
 	return &Config{
-		DBHost:     os.Getenv("DB_HOST"),
-		DBPort:     os.Getenv("DB_PORT"),
-		DBUser:     os.Getenv("DB_USER"),
-		DBPassword: os.Getenv("DB_PASSWORD"),
-		DBName:     os.Getenv("DB_NAME"),
-		DBSSLMode:  os.Getenv("DB_SSLMODE"),
+		DBHost:                     os.Getenv("DB_HOST"),
+		DBPort:                     os.Getenv("DB_PORT"),
+		DBUser:                     os.Getenv("DB_USER"),
+		DBPassword:                 os.Getenv("DB_PASSWORD"),
+		DBName:                     os.Getenv("DB_NAME"),
+		DBSSLMode:                  os.Getenv("DB_SSLMODE"),
+		JWT_SECRET:                 os.Getenv("JWT_SECRET"),
+		JWT_REFRESH_DURATION_HOUR:  refreshHour,
+		JWT_ACCESS_DURATION_MINUTE: accessMin,
 	}
 }

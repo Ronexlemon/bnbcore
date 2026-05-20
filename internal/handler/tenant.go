@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/ronexlemon/bnbcore/internal/auth"
 	"github.com/ronexlemon/bnbcore/internal/domain/tenant"
 )
 
@@ -17,12 +18,14 @@ type RegisterTenantRequest struct {
 type TenantHandler struct{
 	Server *http.ServeMux
 	Service *tenant.Service
+	JWTAuthManager *auth.JwtManager
 }
 
-func NewTenantHandler(server *http.ServeMux,service *tenant.Service)(*TenantHandler){
+func NewTenantHandler(server *http.ServeMux,service *tenant.Service,m *auth.JwtManager)(*TenantHandler){
 	h:=&TenantHandler{
 		Server: server,
 		Service: service,
+		JWTAuthManager: m,
 	}
 	h.registerHandler()
 
