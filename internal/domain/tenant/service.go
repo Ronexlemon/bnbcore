@@ -14,3 +14,13 @@ func NewService(r Repository) *Service {
 func (s *Service) CreateTenant(ctx context.Context, name, subdomain string) error {
     return s.repo.CreateTenant(ctx, name, subdomain)
 }
+
+func(s *Service)  RegisterTenantWithUser(
+	ctx context.Context,
+	tenantName string,
+	subdomain string,
+	email string,
+	passwordHash string,
+) error {
+    return s.repo.RegisterTenantWithUser(ctx,tenantName,subdomain,email,passwordHash)
+}
