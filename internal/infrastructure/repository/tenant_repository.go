@@ -31,3 +31,12 @@ func (p *TenantRepository) CreateTenant(ctx context.Context, name, subdomain str
 	)
 	return err
 }
+
+func (p *TenantRepository) UpdateTenant(ctx context.Context, name, subdomain string) error {
+	_, err := p.DbConnection.Pool.Exec(ctx,
+		`INSERT INTO tenants (id, name, subdomain)
+		 VALUES (gen_random_uuid(), $1, $2)`,
+		name, subdomain,
+	)
+	return err
+}
