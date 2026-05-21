@@ -63,7 +63,7 @@ func (h *TenantHandler)  RegisterTenantWithUser(w http.ResponseWriter,r *http.Re
 	)
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		http.Error(w, "use another shopName Exists", http.StatusBadRequest)
 		return
 	}
 

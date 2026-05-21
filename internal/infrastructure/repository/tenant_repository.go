@@ -29,7 +29,7 @@ func(t *TenantRepository)  RegisterTenantWithUser(
 	tenantName string,
 	subdomain string,
 	email string,
-	passwordHash string,
+	password string,
 ) error {
 
 	tx, err := t.DbConnection.Pool.Begin(ctx)
@@ -71,7 +71,7 @@ func(t *TenantRepository)  RegisterTenantWithUser(
 			$3,
 			'owner'
 		)
-	`, tenantID, email, passwordHash)
+	`, tenantID, email, password)
 
 	if err != nil {
 		return err

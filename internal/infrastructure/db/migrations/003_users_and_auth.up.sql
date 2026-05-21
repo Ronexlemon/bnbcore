@@ -27,14 +27,14 @@ CREATE TABLE users (
     UNIQUE (tenant_id, email)
 );
 
--- =========================
--- REFRESH TOKENS (AUTH)
--- =========================
+-- -- =========================
+-- -- REFRESH TOKENS (AUTH)
+-- -- =========================
 
-CREATE TABLE refresh_tokens (
-    id UUID PRIMARY KEY,
-    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-    token TEXT NOT NULL,
-    expires_at TIMESTAMP NOT NULL,
-    created_at TIMESTAMP DEFAULT now()
-);
+-- CREATE TABLE refresh_tokens (
+--     id UUID PRIMARY KEY,
+--     user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+--     token TEXT NOT NULL,
+--     expires_at TIMESTAMP NOT NULL,
+--     created_at TIMESTAMP DEFAULT now()
+-- );

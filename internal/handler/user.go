@@ -14,6 +14,7 @@ type UserHandler struct {
 	Server *http.ServeMux
 	Service *user.UserService
 	JWTAuthManager *auth.JwtManager
+	
 
 }
 
@@ -22,6 +23,7 @@ func NewUserHandler(server *http.ServeMux,service *user.UserService,manager *aut
 		Server: server,
 		Service: service,
 		JWTAuthManager: manager,
+		
 
 	}
 	h.registerRoutes()
@@ -74,6 +76,7 @@ func(h *UserHandler) LoginHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w,err.Error(),http.StatusNotFound)
 		return
 	}
+
 	
 		pair, err := h.JWTAuthManager.GenerateTokenPair(user_result.ID, user_result.Email, user_result.Role)
 		if err != nil {
@@ -105,7 +108,6 @@ func (h *UserHandler) RefreshHandler(w http.ResponseWriter, r *http.Request) {
 
     tokenRecord, err := h.Service.GetRefreshToken(r.Context(), body.RefreshToken)
 	
-    // 3. If validation passes, look up user information to pass clean claims
     user, err := h.Service.GetUserByID(r.Context(), tokenRecord.UserID)
     _,newAccess, err := h.JWTAuthManager.RefreshAccessToken(body.RefreshToken, user.Email, user.Role)
     if err != nil {

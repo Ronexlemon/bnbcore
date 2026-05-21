@@ -114,10 +114,45 @@ func (u *UserRepository)GetUserByID(ctx context.Context,userID string)(*user.Use
 
 }
 
+func (u *UserRepository) GetUserByEmail(ctx context.Context, email string) (*user.User, error) {
+	var user user.User
+	
+	query := `SELECT id, email, role, tenant_id, password_hash FROM users WHERE email = $1`
+
+	err := u.DBConnection.Pool.QueryRow(ctx, query, email).Scan(
+		&user.ID,
+		&user.Email,
+		&user.Role,
+		&user.TenantID,
+		&user.PasswordHash, 
+	)
+	if err != nil {
+		return nil, errors.New("invalid credentials")
+	}
+
+	return &user, nil
+}
+
+func (u *UserRepository) UpdatePasswordHash(ctx context.Context, userID string, newHash string) error {
+	query := `UPDATE users SET password_hash = $1 WHERE id = $2`
+
+	
+	result, err := u.DBConnection.Pool.Exec(ctx, query, newHash, userID)
+	if err != nil {
+		return fmt.Errorf("failed to update password hash for rotation: %w", err)
+	}
+
+	if result.RowsAffected() == 0 {
+		return fmt.Errorf("no user found with ID %s to update password hash", userID)
+	}
+
+	return nil
+}
+
 func (u *UserRepository) GetRefreshToken(ctx context.Context, refreshToken string)(*user.REFRESHTOKEN,error){
 	var refresh user.REFRESHTOKEN
 
-	query:=`SELECT id,user_id,token_hash,expires_at,is_revoked,created_at FROM users WHERE token_hash=$1`
+	query:=`SELECT id,user_id,token_hash,expires_at,is_revoked,created_at FROM refresh_tokens WHERE token_hash=$1`
 
 	err:=u.DBConnection.Pool.QueryRow(ctx,query,refreshToken).Scan(
 		&refresh.ID,
