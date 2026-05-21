@@ -59,13 +59,31 @@ func (h *UserHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 }
 
 func(h *UserHandler) LoginHandler(w http.ResponseWriter, r *http.Request) {
+
+	var user  user.User
+
+	err:=json.NewDecoder(r.Body).Decode(&user)
+	if err !=nil{
+		http.Error(w,"Invalid body",http.StatusBadRequest)
+		return
+	}
+
+	user_result,err :=h.Service.Login(r.Context(),user.Email,user.PasswordHash)
+
+	if err !=nil{
+		http.Error(w,err.Error(),http.StatusNotFound)
+		return
+	}
 	
-		pair, err := h.JWTAuthManager.GenerateTokenPair("user-123", "alice@example.com", "admin")
+		pair, err := h.JWTAuthManager.GenerateTokenPair(user_result.ID, user_result.Email, user_result.Role)
 		if err != nil {
 			http.Error(w, "could not generate tokens", http.StatusInternalServerError)
 			return
 		}
-		writeJSON(w, pair)
+
+		h.Service.StoreRefreshToken(r.Context(),user_result.ID,pair.RefreshToken,pair.RefreshClaims.IssuedAt.Time,false,pair.RefreshClaims.ExpiresAt.Time)
+		writeJSON(w, map[string]string{"access_token":  pair.AccessToken,
+        "refresh_token": pair.RefreshToken,})
 	
 }
 func (h *UserHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
@@ -76,23 +94,23 @@ func (h *UserHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 }
 
 
-func (h *UserHandler) refreshHandler() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		var body struct {
-			RefreshToken string `json:"refresh_token"`
-		}
-		if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.RefreshToken == "" {
-			http.Error(w, "refresh_token required", http.StatusBadRequest)
-			return
-		}
- 
-		// TODO: look up fresh email/role from DB using the userID in
-		// the refresh token claims before calling RefreshAccessToken.
-		newAccess, err := h.JWTAuthManager.RefreshAccessToken(body.RefreshToken, "alice@example.com", "admin")
-		if err != nil {
-			http.Error(w, "invalid or expired refresh token", http.StatusUnauthorized)
-			return
-		}
-		writeJSON(w, map[string]string{"access_token": newAccess})
-	}
+func (h *UserHandler) RefreshHandler(w http.ResponseWriter, r *http.Request) {
+    var body struct {
+        RefreshToken string `json:"refresh_token"`
+    }
+    if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.RefreshToken == "" {
+        http.Error(w, "refresh_token required", http.StatusBadRequest)
+        return
+    }
+
+    tokenRecord, err := h.Service.GetRefreshToken(r.Context(), body.RefreshToken)
+	
+    // 3. If validation passes, look up user information to pass clean claims
+    user, err := h.Service.GetUserByID(r.Context(), tokenRecord.UserID)
+    _,newAccess, err := h.JWTAuthManager.RefreshAccessToken(body.RefreshToken, user.Email, user.Role)
+    if err != nil {
+        http.Error(w, "invalid or expired refresh token", http.StatusUnauthorized)
+        return
+    }
+    writeJSON(w, map[string]string{"access_token": newAccess})
 }

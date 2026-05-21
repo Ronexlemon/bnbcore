@@ -18,6 +18,7 @@ type Claims struct{
 type TokenPair struct{
 	AccessToken string `json:"access_token"`
 	RefreshToken string `json:"refresh_token"`
+	RefreshClaims *Claims `json:"claims"`
 }
 
 type JwtManager struct{
@@ -37,20 +38,20 @@ func NewJwtManager(secret [] byte,accessTokenDuration,refreshTokenDuration time.
 }
 
 func (m *JwtManager) GenerateTokenPair(userID, email, role string) (*TokenPair, error) {
-	access, err := m.generateToken(userID, email, role, m.accessTokenDuration)
+	_,access, err := m.generateToken(userID, email, role, m.accessTokenDuration)
 	if err != nil {
 		return nil, err
 	}
  
-	refresh, err := m.generateToken(userID, "", "", m.refreshTokenDuration)
+	claims,refresh, err := m.generateToken(userID, "", "", m.refreshTokenDuration)
 	if err != nil {
 		return nil, err
 	}
  
-	return &TokenPair{AccessToken: access, RefreshToken: refresh}, nil
+	return &TokenPair{AccessToken: access, RefreshToken: refresh,RefreshClaims:claims }, nil
 }
 
-func (m *JwtManager) generateToken(userId,email,role string,duration time.Duration)(string,error){
+func (m *JwtManager) generateToken(userId,email,role string,duration time.Duration)(*Claims, string, error){
 
 	now:=time.Now()
 
@@ -66,7 +67,11 @@ func (m *JwtManager) generateToken(userId,email,role string,duration time.Durati
 		},
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims) 
-return token.SignedString(m.secret)
+	signedStr, err := token.SignedString(m.secret)
+	if err != nil {
+		return nil, "", err
+	}
+return claims,signedStr,err
 
 }
 
@@ -93,10 +98,10 @@ func (m *JwtManager) ValidateToken(tokenStr string) (*Claims, error) {
 	return claims, nil
 }
 
-func (m *JwtManager) RefreshAccessToken(refreshToken, email, role string) (string, error) {
+func (m *JwtManager) RefreshAccessToken(refreshToken, email, role string) (*Claims,string, error) {
 	claims, err := m.ValidateToken(refreshToken)
 	if err != nil {
-		return "", err
+		return nil,"", err
 	}
 	return m.generateToken(claims.UserID, email, role, m.accessTokenDuration)
 }
