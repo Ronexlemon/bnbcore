@@ -5,11 +5,12 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/satori/go.uuid"
 )
 
 
 type Claims struct{
-	UserID string `json:"user_id"`
+	UserID uuid.UUID `json:"user_id"`
 	Email string `json:"email"`
 	Role string `json:"role"`
 	jwt.RegisteredClaims
@@ -37,7 +38,7 @@ func NewJwtManager(secret [] byte,accessTokenDuration,refreshTokenDuration time.
 
 }
 
-func (m *JwtManager) GenerateTokenPair(userID, email, role string) (*TokenPair, error) {
+func (m *JwtManager) GenerateTokenPair(userID uuid.UUID, email, role string) (*TokenPair, error) {
 	_,access, err := m.generateToken(userID, email, role, m.accessTokenDuration)
 	if err != nil {
 		return nil, err
@@ -51,7 +52,7 @@ func (m *JwtManager) GenerateTokenPair(userID, email, role string) (*TokenPair, 
 	return &TokenPair{AccessToken: access, RefreshToken: refresh,RefreshClaims:claims }, nil
 }
 
-func (m *JwtManager) generateToken(userId,email,role string,duration time.Duration)(*Claims, string, error){
+func (m *JwtManager) generateToken(userId uuid.UUID,email,role string,duration time.Duration)(*Claims, string, error){
 
 	now:=time.Now()
 
@@ -60,7 +61,7 @@ func (m *JwtManager) generateToken(userId,email,role string,duration time.Durati
 		Email: email,
 		Role: role,
 		RegisteredClaims: jwt.RegisteredClaims{
-			Subject: userId,
+			Subject: userId.String(),
 			IssuedAt: jwt.NewNumericDate(now),
 			ExpiresAt: jwt.NewNumericDate(now.Add(duration)),
 			NotBefore: jwt.NewNumericDate(now),

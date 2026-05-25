@@ -32,47 +32,42 @@ func NewTenantHandler(server *http.ServeMux,service *tenant.Service,m *auth.JwtM
 	return  h
 }
 
-func(h *TenantHandler) registerHandler(){
+func (h *TenantHandler) registerHandler() {
 	api := "/api/v1"
-	h.Server.HandleFunc(api+"/tenant/register", h.RegisterTenantWithUser)
+
+	h.Server.Handle("POST "+api+"/tenant/register",
+		h.JWTAuthManager.Authenticate(http.HandlerFunc(h.RegisterTenantWithUser)))
 }
 
-func (h *TenantHandler)  RegisterTenantWithUser(w http.ResponseWriter,r *http.Request){
-
-	if r.Method != http.MethodPost{
-		http.Error(w,"method not allowed",http.StatusMethodNotAllowed)
-		return
-	}
-
+func (h *TenantHandler) RegisterTenantWithUser(w http.ResponseWriter, r *http.Request) {
 	var req RegisterTenantRequest
 
-	err:=json.NewDecoder(r.Body).Decode(&req)
-	if err !=nil{
-		http.Error(w,"invalid request body",http.StatusBadRequest)
+	claims := auth.ClaimsFromContext(r.Context())
+	if claims == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
 
-	ctx := r.Context()
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+ 
+	//todo check if user exists
 
-	err = h.Service.RegisterTenantWithUser(
-		ctx,
-		req.ShopName,
+	result, err := h.Service.CreateTenantWithOwner(
+		r.Context(),
+		claims.UserID,
 		req.Subdomain,
-		req.Email,
-		req.Password,
+		req.Subdomain,
 	)
-
 	if err != nil {
-		http.Error(w, "use another shopName Exists", http.StatusBadRequest)
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-
-	json.NewEncoder(w).Encode(map[string]string{
+	writeJSON(w, map[string]any{
 		"message": "tenant created successfully",
+		"data":result,
 	})
-
-
 }

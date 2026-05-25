@@ -1,20 +1,31 @@
 package user
 
-import "time"
+import (
+	"time"
 
+	pgxsatori "github.com/jackc/pgx/pgtype/ext/satori-uuid"
+	//"github.com/ronexlemon/bnbcore/internal/auth"
+	"github.com/satori/go.uuid"
+)
+
+type GoogleLoginRequest struct {
+	Credential  string `json:"credential"` 
+}
 
 type User struct {
-	ID           string `json:"id"`
-	TenantID     string  `json:"tenant_id"`
+	ID           uuid.UUID `json:"id"`
+	TenantID      *pgxsatori.UUID  `json:"tenant_id"`
 	Email        string  `json:"email"`
 	PasswordHash string  `json:"password"`
 	Role         string   `json:"role"`
+	IsActive      bool `json:"is_active"`
+	CreatedAt    time.Time `json:"created_at"`
 }
 
 
 type REFRESHTOKEN struct{
 		ID			string `json:"id"` 
-		UserID		string	`json:"user_id"` 
+		UserID		*uuid.UUID	`json:"user_id"` 
 		TokenHash	string  `json:"token_hash"` 
 		ExpiresAt	time.Time	 `json:"expires_at"` 
 		IsRevoked	bool	`json:"is_revoked"` 

@@ -19,6 +19,7 @@ type Config struct {
     EncryptedDataKeyHex string
 	PASSWORD_PEPPERS string
 	ACTIVE_PEPPER_VERSION string
+	GOOGLE_CLIENT_ID string
 
 }
 
@@ -49,6 +50,7 @@ func Load() *Config {
 		EncryptedDataKeyHex: os.Getenv("EncryptedDataKeyHex"),
 		PASSWORD_PEPPERS: os.Getenv("PASSWORD_PEPPERS"),
 		ACTIVE_PEPPER_VERSION: os.Getenv("ACTIVE_PEPPER_VERSION"),
+		GOOGLE_CLIENT_ID:os.Getenv("GOOGLE_CLIENT_ID"),
 
 	}
 }

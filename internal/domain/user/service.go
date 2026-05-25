@@ -5,6 +5,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/satori/go.uuid"
 	"github.com/ronexlemon/bnbcore/internal/auth/password"
 	"github.com/ronexlemon/bnbcore/internal/auth/token"
 )
@@ -13,19 +14,21 @@ type UserService struct{
 	Repo UserRepository
 	PasswordEngine *password.PasswordHasher
 	TokenEngine    *token.TokenHasher
+	GoogleClientID string
 }
 
 
-func NewUserservice(repo UserRepository,passEngine *password.PasswordHasher,tokenEngine *token.TokenHasher)(*UserService){
+func NewUserservice(repo UserRepository,passEngine *password.PasswordHasher,tokenEngine *token.TokenHasher,googleClientID string,)(*UserService){
 	return &UserService{
 		Repo: repo,
 		PasswordEngine: passEngine,
 		TokenEngine: tokenEngine,
+		GoogleClientID: googleClientID,
 	}
 }
 
 
-func (u *UserService)Register(ctx context.Context,tenantID string,email string,password string)error{
+func (u *UserService)Register(ctx context.Context,tenantID uuid.UUID,email string,password string)error{
      hashedPassword, err := u.PasswordEngine.Hash(password)
 	if err != nil {
 		return err
@@ -64,13 +67,20 @@ func (u *UserService)GetRefreshToken(ctx context.Context, refreshToken string)(*
 	return u.Repo.GetRefreshToken(ctx, lookupHash)
 }
 
-func (u *UserService)StoreRefreshToken(ctx context.Context,userID string,refreshToken string,createdAt time.Time,isRevoked bool,expiresAt time.Time)error{
+func (u *UserService)StoreRefreshToken(ctx context.Context,userID uuid.UUID,refreshToken string,createdAt time.Time,isRevoked bool,expiresAt time.Time)error{
 	lookupHash := u.TokenEngine.Hash(refreshToken)
 	
 	return u.Repo.StoreRefreshToken(ctx, userID, lookupHash, createdAt, isRevoked, expiresAt)
 }
 
-func (u *UserService)GetUserByID(ctx context.Context,userID string)(*User,error){
+func (u *UserService)GetUserByID(ctx context.Context,userID uuid.UUID)(*User,error){
 	return u.Repo.GetUserByID(ctx,userID)
 
+}
+
+func (u *UserService) LoginWithGoogle(ctx context.Context, req GoogleLoginRequest) (*User, error) {
+	if u.GoogleClientID == "" {
+		return nil, errors.New("google login is not configured")
+	}
+	return u.Repo.LoginWithGoogle(ctx, u.GoogleClientID, req)
 }

@@ -57,7 +57,7 @@ func NewMuxService(ctx context.Context)*http.ServeMux{
 		log.Fatalf("master key and active encryptedHex need needed: %v", err)
 	}
 	tenant_service := tenant.NewService(tenant_repo,passwordEngine)
-	user_service := user.NewUserservice(user_repo,passwordEngine,tokenEngine)
+	user_service := user.NewUserservice(user_repo,passwordEngine,tokenEngine,config_env.GOOGLE_CLIENT_ID)
 	
 	_ = handler.NewTenantHandler(mux, tenant_service,jwtManager)
 	_ =handler.NewUserHandler(mux,user_service,jwtManager)
