@@ -20,6 +20,7 @@ type Config struct {
 	PASSWORD_PEPPERS string
 	ACTIVE_PEPPER_VERSION string
 	GOOGLE_CLIENT_ID string
+	BASE_DOMAIN string
 
 }
 
@@ -51,6 +52,7 @@ func Load() *Config {
 		PASSWORD_PEPPERS: os.Getenv("PASSWORD_PEPPERS"),
 		ACTIVE_PEPPER_VERSION: os.Getenv("ACTIVE_PEPPER_VERSION"),
 		GOOGLE_CLIENT_ID:os.Getenv("GOOGLE_CLIENT_ID"),
+		BASE_DOMAIN:os.Getenv("BASE_DOMAIN"),
 
 	}
 }

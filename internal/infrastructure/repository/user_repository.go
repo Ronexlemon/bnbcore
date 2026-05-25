@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/ronexlemon/bnbcore/internal/domain/tenant"
 	"github.com/ronexlemon/bnbcore/internal/domain/user"
 	"github.com/ronexlemon/bnbcore/internal/infrastructure/db"
 	"github.com/satori/go.uuid"
@@ -30,29 +31,89 @@ func NewUserRepository(dbconnect *db.PostgresConn)(*UserRepository,error){
 }
 
 
-func (u *UserRepository) Register(ctx context.Context,tenantID uuid.UUID,email string,password string,
-) error {
-	_, err := u.DBConnection.Pool.Exec(
-		ctx,`INSERT INTO users (id,tenant_id,email,password_hash,role)
-		VALUES (gen_random_uuid(),$1,$2,$3,'owner')`,tenantID,email,password,
-	)
+func (u *UserRepository) Register(ctx context.Context, email, hashedPassword, shopName, subdomain string) (*user.User, error) {
+    tx, err := u.DBConnection.Pool.Begin(ctx)
+    if err != nil {
+        return nil, fmt.Errorf("failed to begin transaction: %w", err)
+    }
+    defer tx.Rollback(ctx)
 
-	if err != nil {
-		return err
-	}
+    var ten struct {
+        ID        uuid.UUID
+        ShopName  string
+        Subdomain string
+    }
 
-	return nil
+    // trial_ends_at = 14 days from now
+    trialEndsAt := time.Now().Add(14 * 24 * time.Hour)
+
+    err = tx.QueryRow(ctx, `
+        INSERT INTO tenants (id, name, subdomain, status, trial_ends_at, created_at)
+        VALUES (gen_random_uuid(), $1, $2, 'trial', $3, NOW())
+        RETURNING id, name, subdomain
+    `, shopName, subdomain, trialEndsAt).Scan(
+        &ten.ID,
+        &ten.ShopName,
+        &ten.Subdomain,
+    )
+    if err != nil {
+        return nil, fmt.Errorf("failed to create tenant: %w", err)
+    }
+
+    var usr user.User
+    err = tx.QueryRow(ctx, `
+        INSERT INTO users (id, tenant_id, email, password_hash, role, is_active, created_at)
+        VALUES (gen_random_uuid(), $1, $2, $3, 'owner', true, NOW())
+        RETURNING id, tenant_id, email, role, is_active, created_at
+    `, ten.ID, email, hashedPassword).Scan(
+        &usr.ID,
+        &usr.TenantID,
+        &usr.Email,
+        &usr.Role,
+        &usr.IsActive,
+        &usr.CreatedAt,
+    )
+    if err != nil {
+        return nil, fmt.Errorf("failed to create user: %w", err)
+    }
+
+    if err := tx.Commit(ctx); err != nil {
+        return nil, fmt.Errorf("failed to commit: %w", err)
+    }
+
+    usr.Subdomain = ten.Subdomain
+    usr.ShopName  = ten.ShopName
+
+    return &usr, nil
 }
 
 func (u *UserRepository) Login(ctx context.Context,email,password string)(*user.User,error){
 	var user user.User
-	query := `SELECT id, tenant_id, email, password_hash, role FROM users WHERE email=$1`
+	query := `
+        SELECT 
+            u.id,
+            u.tenant_id,
+            u.email,
+            u.password_hash,
+            u.created_at,
+            u.is_active,
+            u.role,
+            t.subdomain,
+            t.name
+        FROM users u
+        INNER JOIN tenants t ON t.id = u.tenant_id
+        WHERE u.email = $1
+    `
 	err:=u.DBConnection.Pool.QueryRow(ctx,query,email).Scan(
 		&user.ID,
-		&user.TenantID,
-		&user.Email,
-		&user.PasswordHash,
-		&user.Role,
+        &user.TenantID,
+        &user.Email,
+        &user.PasswordHash,
+        &user.CreatedAt,
+        &user.IsActive,
+        &user.Role,
+        &user.Subdomain,  
+        &user.ShopName,
 	)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -60,8 +121,7 @@ func (u *UserRepository) Login(ctx context.Context,email,password string)(*user.
 		}
 		return nil, err
 	}
-
-	//bycrypt compare passwrds hash
+	 user.PasswordHash = ""
 
 	return &user,nil
 	
@@ -89,47 +149,93 @@ func (u *UserRepository)StoreRefreshToken(ctx context.Context,userID uuid.UUID,r
 
 
 
-func (u *UserRepository)GetUserByID(ctx context.Context,userID uuid.UUID)(*user.User,error){
-	var user user.User
-	query:=`SELECT id,email,role,tenant_id FROM users WHERE id=$1`
+func (u *UserRepository) GetUserByID(ctx context.Context, userID uuid.UUID) (*user.User, error) {
+    var usr user.User
 
-	err:=u.DBConnection.Pool.QueryRow(ctx,query,userID).Scan(
-		&user.ID,
-		&user.Email,
-		&user.Role,
-		&user.TenantID,
-	)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, errors.New("invalid credentials")
-		}
-		return nil, err
-	}
+    query := `
+        SELECT
+            u.id,
+            u.email,
+            u.role,
+            u.tenant_id,
+            u.created_at,
+            u.is_active,
+            t.subdomain,
+            t.name
+        FROM users u
+        INNER JOIN tenants t ON t.id = u.tenant_id
+        WHERE u.id = $1
+    `
 
+    err := u.DBConnection.Pool.QueryRow(ctx, query, userID).Scan(
+        &usr.ID,
+        &usr.Email,
+        &usr.Role,
+        &usr.TenantID,
+        &usr.CreatedAt,
+        &usr.IsActive,
+        &usr.Subdomain,
+        &usr.ShopName,
+    )
+    if err != nil {
+        if errors.Is(err, pgx.ErrNoRows) { 
+            return nil, errors.New("user not found")
+        }
+        return nil, err
+    }
 
-	return &user,nil
-
+    return &usr, nil
 }
 
 func (u *UserRepository) GetUserByEmail(ctx context.Context, email string) (*user.User, error) {
-	var user user.User
-	
-	query := `SELECT id, email, role, tenant_id, password_hash FROM users WHERE email = $1`
+    var usr user.User
 
-	err := u.DBConnection.Pool.QueryRow(ctx, query, email).Scan(
-		&user.ID,
-		&user.Email,
-		&user.Role,
-		&user.TenantID,
-		&user.PasswordHash, 
-	)
-	if err != nil {
-		return nil, errors.New("invalid credentials")
-	}
+    query := `
+        SELECT
+            u.id,
+            u.email,
+            u.password_hash,
+            u.role,
+            u.tenant_id,
+            u.created_at,
+            u.is_active,
+            t.subdomain,
+            t.name
+        FROM users u
+        INNER JOIN tenants t ON t.id = u.tenant_id
+        WHERE u.email = $1
+    `
 
-	return &user, nil
+    err := u.DBConnection.Pool.QueryRow(ctx, query, email).Scan(
+        &usr.ID,
+        &usr.Email,
+        &usr.PasswordHash,
+        &usr.Role,
+        &usr.TenantID,
+        &usr.CreatedAt,
+        &usr.IsActive,
+        &usr.Subdomain,
+        &usr.ShopName,
+    )
+    if err != nil {
+        if errors.Is(err, pgx.ErrNoRows) {
+            return nil, errors.New("invalid credentials")
+        }
+        return nil, fmt.Errorf("failed to get user by email: %w", err)
+    }
+
+    return &usr, nil
 }
 
+func (u *UserRepository) EmailExists(ctx context.Context, email string) (bool, error) {
+    var exists bool
+    query := `SELECT EXISTS(SELECT 1 FROM users WHERE email = $1)`
+    err := u.DBConnection.Pool.QueryRow(ctx, query, email).Scan(&exists)
+    if err != nil {
+        return false, fmt.Errorf("failed to check email: %w", err)
+    }
+    return exists, nil
+}
 func (u *UserRepository) UpdatePasswordHash(ctx context.Context, userID uuid.UUID, newHash string) error {
 	query := `UPDATE users SET password_hash = $1 WHERE id = $2`
 
@@ -170,67 +276,151 @@ func (u *UserRepository) GetRefreshToken(ctx context.Context, refreshToken strin
 
 }
 
+
+func (u *UserRepository) SubdomainExists(ctx context.Context, subdomain string) (bool, error) {
+    var exists bool
+    query := `SELECT EXISTS(SELECT 1 FROM tenants WHERE subdomain = $1)`
+    err := u.DBConnection.Pool.QueryRow(ctx, query, subdomain).Scan(&exists)
+    if err != nil {
+        return false, fmt.Errorf("failed to check subdomain: %w", err)
+    }
+    return exists, nil
+}
+
+func (u *UserRepository) GoogleRegister(ctx context.Context, email, shopName, subdomain string) (*user.User, error) {
+    tx, err := u.DBConnection.Pool.Begin(ctx)
+    if err != nil {
+        return nil, fmt.Errorf("failed to begin transaction: %w", err)
+    }
+    defer tx.Rollback(ctx)
+
+    var ten struct {
+        ID        uuid.UUID
+        ShopName  string
+        Subdomain string
+    }
+
+    trialEndsAt := time.Now().Add(14 * 24 * time.Hour)
+
+    err = tx.QueryRow(ctx, `
+        INSERT INTO tenants (id, name, subdomain, status, trial_ends_at, created_at)
+        VALUES (gen_random_uuid(), $1, $2, 'trial', $3, NOW())
+        RETURNING id, name, subdomain
+    `, shopName, subdomain, trialEndsAt).Scan(
+        &ten.ID,
+        &ten.ShopName,
+        &ten.Subdomain,
+    )
+    if err != nil {
+        return nil, fmt.Errorf("failed to create tenant: %w", err)
+    }
+
+    var usr user.User
+    err = tx.QueryRow(ctx, `
+        INSERT INTO users (id, tenant_id, email, password_hash, role, is_active, created_at)
+        VALUES (gen_random_uuid(), $1, $2, 'OAUTH_EXTERNAL_ACCOUNT', 'owner', true, NOW())
+        RETURNING id, tenant_id, email, role, is_active, created_at
+    `, ten.ID, email).Scan(
+        &usr.ID,
+        &usr.TenantID,
+        &usr.Email,
+        &usr.Role,
+        &usr.IsActive,
+        &usr.CreatedAt,
+    )
+    if err != nil {
+        return nil, fmt.Errorf("failed to create user: %w", err)
+    }
+
+    if err := tx.Commit(ctx); err != nil {
+        return nil, fmt.Errorf("failed to commit: %w", err)
+    }
+
+    usr.Subdomain = ten.Subdomain
+    usr.ShopName  = ten.ShopName
+
+    return &usr, nil
+}
 func (u *UserRepository) LoginWithGoogle(ctx context.Context, googleClientID string, req user.GoogleLoginRequest) (*user.User, error) {
-	
-	payload, err := idtoken.Validate(ctx, req.Credential, googleClientID)
-	if err != nil {
-		return nil, fmt.Errorf("invalid google token: %w", err)
-	}
 
-	email, ok := payload.Claims["email"].(string)
-	if !ok {
-		return nil, errors.New("google token missing email claim")
-	}
+    payload, err := idtoken.Validate(ctx, req.Credential, googleClientID)
+    if err != nil {
+        return nil, fmt.Errorf("invalid google token: %w", err)
+    }
 
-	// Step 2: Check if user already exists for this tenant + email pair
-	var existing user.User
-	selectQuery := `
-		SELECT id, email, password_hash, role, is_active, created_at
-		FROM users
-		WHERE  email = $2`
+    email, ok := payload.Claims["email"].(string)
+    if !ok {
+        return nil, errors.New("google token missing email claim")
+    }
 
-	err = u.DBConnection.Pool.QueryRow(ctx, selectQuery, email).Scan(
-		&existing.ID,
-		&existing.TenantID,
-		&existing.Email,
-		&existing.PasswordHash,
-		&existing.Role,
-		&existing.IsActive,
-		&existing.CreatedAt,
-	)
+    // Pull tenant from context — set by SubdomainResolver upstream
+    t := tenant.FromContext(ctx)
+    if t == nil {
+        return nil, errors.New("tenant not found in context")
+    }
 
-	if err == nil {
-		return &existing, nil
-	}
-	if !errors.Is(err, pgx.ErrNoRows) {
-		return nil, fmt.Errorf("failed to query user: %w", err)
-	}
+    var existing user.User
+    selectQuery := `
+        SELECT
+            u.id,
+            u.tenant_id,
+            u.email,
+            u.password_hash,
+            u.role,
+            u.is_active,
+            u.created_at,
+            t.subdomain,
+            t.name
+        FROM users u
+        INNER JOIN tenants t ON t.id = u.tenant_id
+        WHERE u.email = $1
+          AND u.tenant_id = $2
+    `
+    err = u.DBConnection.Pool.QueryRow(ctx, selectQuery, email, t.ID).Scan(
+        &existing.ID,
+        &existing.TenantID,
+        &existing.Email,
+        &existing.PasswordHash,
+        &existing.Role,
+        &existing.IsActive,
+        &existing.CreatedAt,
+        &existing.Subdomain,
+        &existing.ShopName,
+    )
+    if err == nil {
+        return &existing, nil
+    }
+    if !errors.Is(err, pgx.ErrNoRows) {
+        return nil, fmt.Errorf("failed to query user: %w", err)
+    }
 
-	
-	newUser := &user.User{
-		ID:           uuid.NewV4(),
-		Email:        email,
-		PasswordHash: "OAUTH_EXTERNAL_ACCOUNT", 
-		Role:         "owner",                  
-		IsActive:     true,
-	}
+    newUser := &user.User{
+        ID:           uuid.NewV4(),
+        TenantID:     &t.ID,
+        Email:        email,
+        PasswordHash: "OAUTH_EXTERNAL_ACCOUNT",
+        Role:         "owner",
+        IsActive:     true,
+        Subdomain:    t.Subdomain,
+        ShopName:     t.Name,
+    }
 
-	insertQuery := `
-		INSERT INTO users (id, tenant_id, email, password_hash, role, is_active, created_at)
-		VALUES ($1, $2, $3, $4, $5, $6, NOW())
-		RETURNING created_at`
+    insertQuery := `
+        INSERT INTO users (id, tenant_id, email, password_hash, role, is_active, created_at)
+        VALUES ($1, $2, $3, $4, $5, $6, NOW())
+        RETURNING created_at
+    `
+    err = u.DBConnection.Pool.QueryRow(ctx, insertQuery,
+        newUser.ID,
+        newUser.TenantID,
+        newUser.Email,
+        newUser.PasswordHash,
+        newUser.Role,
+        newUser.IsActive,
+    ).Scan(&newUser.CreatedAt)
+    if err != nil {
+        return nil, fmt.Errorf("failed to auto-register google user: %w", err)
+    }
 
-	err = u.DBConnection.Pool.QueryRow(ctx, insertQuery,
-		newUser.ID,
-		newUser.TenantID,
-		newUser.Email,
-		newUser.PasswordHash,
-		newUser.Role,
-		newUser.IsActive,
-	).Scan(&newUser.CreatedAt)
-	if err != nil {
-		return nil, fmt.Errorf("failed to auto-register google user: %w", err)
-	}
-
-	return newUser, nil
+    return newUser, nil
 }

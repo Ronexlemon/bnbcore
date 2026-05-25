@@ -13,6 +13,8 @@ type Claims struct{
 	UserID uuid.UUID `json:"user_id"`
 	Email string `json:"email"`
 	Role string `json:"role"`
+	TenantID string `json:"tenant_id"`  
+    Subdomain string `json:"subdomain"` 
 	jwt.RegisteredClaims
 }
 
@@ -38,13 +40,13 @@ func NewJwtManager(secret [] byte,accessTokenDuration,refreshTokenDuration time.
 
 }
 
-func (m *JwtManager) GenerateTokenPair(userID uuid.UUID, email, role string) (*TokenPair, error) {
-	_,access, err := m.generateToken(userID, email, role, m.accessTokenDuration)
+func (m *JwtManager) GenerateTokenPair(userID uuid.UUID, email, role string,subdomain string) (*TokenPair, error) {
+	_,access, err := m.generateToken(userID, email, role, m.accessTokenDuration ,subdomain)
 	if err != nil {
 		return nil, err
 	}
  
-	claims,refresh, err := m.generateToken(userID, "", "", m.refreshTokenDuration)
+	claims,refresh, err := m.generateToken(userID, "", "", m.refreshTokenDuration,subdomain)
 	if err != nil {
 		return nil, err
 	}
@@ -52,7 +54,7 @@ func (m *JwtManager) GenerateTokenPair(userID uuid.UUID, email, role string) (*T
 	return &TokenPair{AccessToken: access, RefreshToken: refresh,RefreshClaims:claims }, nil
 }
 
-func (m *JwtManager) generateToken(userId uuid.UUID,email,role string,duration time.Duration)(*Claims, string, error){
+func (m *JwtManager) generateToken(userId uuid.UUID,email,role string,duration time.Duration,subdomain string)(*Claims, string, error){
 
 	now:=time.Now()
 
@@ -60,6 +62,7 @@ func (m *JwtManager) generateToken(userId uuid.UUID,email,role string,duration t
 		UserID: userId,
 		Email: email,
 		Role: role,
+		Subdomain: subdomain,
 		RegisteredClaims: jwt.RegisteredClaims{
 			Subject: userId.String(),
 			IssuedAt: jwt.NewNumericDate(now),
@@ -99,11 +102,11 @@ func (m *JwtManager) ValidateToken(tokenStr string) (*Claims, error) {
 	return claims, nil
 }
 
-func (m *JwtManager) RefreshAccessToken(refreshToken, email, role string) (*Claims,string, error) {
+func (m *JwtManager) RefreshAccessToken(refreshToken, email, role string,subdomain string) (*Claims,string, error) {
 	claims, err := m.ValidateToken(refreshToken)
 	if err != nil {
 		return nil,"", err
 	}
-	return m.generateToken(claims.UserID, email, role, m.accessTokenDuration)
+	return m.generateToken(claims.UserID, email, role, m.accessTokenDuration,subdomain)
 }
  

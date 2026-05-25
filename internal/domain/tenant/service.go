@@ -57,3 +57,7 @@ func (s *Service)CreateTenantWithOwner(ctx context.Context,userID uuid.UUID,tena
     return s.repo.CreateTenantWithOwner(ctx,userID,tenantName,subdomain)
 
 } 
+
+func (s *Service)  FindBySubdomain(ctx context.Context, sub string)(*Tenant, error){
+    return s.repo.FindBySubdomain(ctx,sub)
+}

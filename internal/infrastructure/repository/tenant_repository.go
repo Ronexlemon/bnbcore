@@ -115,6 +115,31 @@ func (t *TenantRepository) SubdomainExists(ctx context.Context, subdomain string
 	err := t.DbConnection.Pool.QueryRow(ctx, q, subdomain).Scan(&exists)
 	return exists, err
 }
+func (t *TenantRepository) FindBySubdomain(ctx context.Context, sub string) (*tenant.Tenant, error) {
+    var tn tenant.Tenant
+
+    query := `
+    SELECT id, name, subdomain, status, trial_ends_at, created_at
+    FROM tenants
+    WHERE subdomain = $1
+`
+err := t.DbConnection.Pool.QueryRow(ctx, query, sub).Scan(
+    &tn.ID,
+    &tn.Name,
+    &tn.Subdomain,
+    &tn.Status,
+    &tn.TrialEndsAt,
+    &tn.CreatedAt,
+)
+    if err != nil {
+        if errors.Is(err, pgx.ErrNoRows) {
+            return nil, errors.New("tenant not found")
+        }
+        return nil, fmt.Errorf("failed to find tenant by subdomain: %w", err)
+    }
+
+    return &tn, nil
+}
 
 func (t *TenantRepository) UpdateTenant(ctx context.Context, name, subdomain string) error {
 	_, err := t.DbConnection.Pool.Exec(ctx,

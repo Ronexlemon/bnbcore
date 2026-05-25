@@ -2,9 +2,6 @@ package user
 
 import (
 	"time"
-
-	pgxsatori "github.com/jackc/pgx/pgtype/ext/satori-uuid"
-	//"github.com/ronexlemon/bnbcore/internal/auth"
 	"github.com/satori/go.uuid"
 )
 
@@ -14,11 +11,14 @@ type GoogleLoginRequest struct {
 
 type User struct {
 	ID           uuid.UUID `json:"id"`
-	TenantID      *pgxsatori.UUID  `json:"tenant_id"`
+	TenantID      *uuid.UUID  `json:"tenant_id"`
 	Email        string  `json:"email"`
-	PasswordHash string  `json:"password"`
+	PasswordHash string  `json:"password_hash"`
+	Password  string `json:"password"`
 	Role         string   `json:"role"`
 	IsActive      bool `json:"is_active"`
+	Subdomain    string  `json:"subdomain"`
+    ShopName     string `json:"shop_name"`
 	CreatedAt    time.Time `json:"created_at"`
 }
 
