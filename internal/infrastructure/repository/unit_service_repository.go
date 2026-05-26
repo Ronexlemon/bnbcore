@@ -11,15 +11,18 @@ import (
 	"github.com/ronexlemon/bnbcore/internal/infrastructure/db"
 )
 
-type RoomServiceRepository struct {
+type UnitServiceRepository struct {
     DbConnection *db.PostgresConn
 }
 
-func NewRoomServiceRepository(dbconn *db.PostgresConn) *RoomServiceRepository {
-    return &RoomServiceRepository{DbConnection: dbconn}
+func NewUnitServiceRepository(dbconn *db.PostgresConn) (*UnitServiceRepository,error) {
+	if dbconn ==nil{
+		return nil,fmt.Errorf("Db connection failed")
+	}
+    return &UnitServiceRepository{DbConnection: dbconn},nil
 }
 
-func (r *RoomServiceRepository) Create(ctx context.Context, s *rs.RoomService) (*rs.RoomService, error) {
+func (r *UnitServiceRepository) Create(ctx context.Context, s *rs.UnitService) (*rs.UnitService, error) {
     query := `
         INSERT INTO room_services (id, unit_id, tenant_id, agent_name, mobile, email, is_active, created_at, updated_at)
         VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
@@ -40,8 +43,8 @@ func (r *RoomServiceRepository) Create(ctx context.Context, s *rs.RoomService) (
     return s, nil
 }
 
-func (r *RoomServiceRepository) GetByID(ctx context.Context, id, tenantID uuid.UUID) (*rs.RoomService, error) {
-    var s rs.RoomService
+func (r *UnitServiceRepository) GetByID(ctx context.Context, id, tenantID uuid.UUID) (*rs.UnitService, error) {
+    var s rs.UnitService
     query := `
         SELECT id, unit_id, tenant_id, agent_name, mobile, email, is_active, created_at, updated_at
         FROM room_services
@@ -68,7 +71,7 @@ func (r *RoomServiceRepository) GetByID(ctx context.Context, id, tenantID uuid.U
     return &s, nil
 }
 
-func (r *RoomServiceRepository) GetByUnit(ctx context.Context, unitID, tenantID uuid.UUID) ([]*rs.RoomService, error) {
+func (r *UnitServiceRepository) GetByUnit(ctx context.Context, unitID, tenantID uuid.UUID) ([]*rs.UnitService, error) {
     query := `
         SELECT id, unit_id, tenant_id, agent_name, mobile, email, is_active, created_at, updated_at
         FROM room_services
@@ -82,9 +85,9 @@ func (r *RoomServiceRepository) GetByUnit(ctx context.Context, unitID, tenantID 
     }
     defer rows.Close()
 
-    var services []*rs.RoomService
+    var services []*rs.UnitService
     for rows.Next() {
-        var s rs.RoomService
+        var s rs.UnitService
         if err := rows.Scan(
             &s.ID,
             &s.UnitID,
@@ -103,7 +106,7 @@ func (r *RoomServiceRepository) GetByUnit(ctx context.Context, unitID, tenantID 
     return services, nil
 }
 
-func (r *RoomServiceRepository) Update(ctx context.Context, id, tenantID uuid.UUID, req rs.UpdateRoomServiceRequest) (*rs.RoomService, error) {
+func (r *UnitServiceRepository) Update(ctx context.Context, id, tenantID uuid.UUID, req rs.UpdateUnitServiceRequest) (*rs.UnitService, error) {
     query := `
         UPDATE room_services SET
             agent_name = COALESCE($1, agent_name),
@@ -115,7 +118,7 @@ func (r *RoomServiceRepository) Update(ctx context.Context, id, tenantID uuid.UU
           AND tenant_id = $6
         RETURNING id, unit_id, tenant_id, agent_name, mobile, email, is_active, created_at, updated_at
     `
-    var s rs.RoomService
+    var s rs.UnitService
     err := r.DbConnection.Pool.QueryRow(ctx, query,
         req.AgentName,
         req.Mobile,
@@ -143,7 +146,7 @@ func (r *RoomServiceRepository) Update(ctx context.Context, id, tenantID uuid.UU
     return &s, nil
 }
 
-func (r *RoomServiceRepository) Delete(ctx context.Context, id, tenantID uuid.UUID) error {
+func (r *UnitServiceRepository) Delete(ctx context.Context, id, tenantID uuid.UUID) error {
     tag, err := r.DbConnection.Pool.Exec(ctx,
         `DELETE FROM room_services WHERE id = $1 AND tenant_id = $2`,
         id, tenantID,
@@ -157,4 +160,4 @@ func (r *RoomServiceRepository) Delete(ctx context.Context, id, tenantID uuid.UU
     return nil
 }
 
-var _ rs.RoomServiceRepository = (*RoomServiceRepository)(nil)
+var _ rs.RoomServiceRepository = (*UnitServiceRepository)(nil)

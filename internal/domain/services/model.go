@@ -6,7 +6,7 @@ import (
 	"github.com/google/uuid"
 )
 
-type RoomService struct {
+type UnitService struct {
     ID        uuid.UUID
     UnitID    uuid.UUID
     TenantID  uuid.UUID
@@ -18,13 +18,13 @@ type RoomService struct {
     UpdatedAt time.Time
 }
 
-type CreateRoomServiceRequest struct {
+type CreateUnitServiceRequest struct {
     AgentName string `json:"agent_name"`
     Mobile    string `json:"mobile"`
     Email     string `json:"email"`
 }
 
-type UpdateRoomServiceRequest struct {
+type UpdateUnitServiceRequest struct {
     AgentName *string `json:"agent_name"`
     Mobile    *string `json:"mobile"`
     Email     *string `json:"email"`

@@ -12,6 +12,7 @@ import (
 	"github.com/ronexlemon/bnbcore/internal/auth/token"
 	"github.com/ronexlemon/bnbcore/internal/config"
 	"github.com/ronexlemon/bnbcore/internal/domain/booking"
+	"github.com/ronexlemon/bnbcore/internal/domain/services"
 	"github.com/ronexlemon/bnbcore/internal/domain/tenant"
 	"github.com/ronexlemon/bnbcore/internal/domain/unit"
 	"github.com/ronexlemon/bnbcore/internal/domain/user"
@@ -60,6 +61,11 @@ func NewMuxService(ctx context.Context) http.Handler {
         log.Fatalf("Failed to initialize booking repository: %v", err)
     }
 
+	unit_service_repo, err:= repository.NewUnitServiceRepository(conn)
+    if err != nil {
+        log.Fatalf("Failed to initialize unit service repository: %v", err)
+    }
+
     passwordEngine, err := password.NewPasswordHasher(peppers, config_env.ACTIVE_PEPPER_VERSION)
     if err != nil {
         log.Fatalf("password pepper and active version needed: %v", err)
@@ -72,13 +78,15 @@ func NewMuxService(ctx context.Context) http.Handler {
 
     tenant_service := tenant.NewService(tenant_repo, passwordEngine)
 	unit_service := unit.NewUnitService(unit_repo)
+	unit_service_service := services.NewService(unit_service_repo)
 	booking_service := booking.NewBookingService(booking_repo)
     user_service := user.NewUserservice(user_repo, passwordEngine, tokenEngine, config_env.GOOGLE_CLIENT_ID)
 
-    _ = handler.NewTenantHandler(mux, tenant_service, jwtManager)
-    _ = handler.NewUserHandler(mux, user_service, jwtManager,config_env.BASE_DOMAIN)
+     _ = handler.NewTenantHandler(mux, tenant_service, jwtManager)
+     _ = handler.NewUserHandler(mux, user_service, jwtManager,config_env.BASE_DOMAIN)
 	 _ = handler.NewUnitHandler(mux, unit_service, jwtManager)
-	  _ = handler.NewBookingHandler(mux, booking_service, jwtManager)
+	 _ = handler.NewBookingHandler(mux, booking_service, jwtManager)
+	 _ = handler.NewRoomServiceHandler(mux,unit_service_service, jwtManager)
 
     return auth.SubdomainResolver(tenant_service, config_env.BASE_DOMAIN)(mux)
 }

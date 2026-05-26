@@ -63,7 +63,7 @@ func (h *RoomServiceHandler) Create(w http.ResponseWriter, r *http.Request) {
     }
 tenantID := *claims.TenantID
 
-    var req rs.CreateRoomServiceRequest
+    var req rs.CreateUnitServiceRequest
     if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
         http.Error(w, "invalid request body", http.StatusBadRequest)
         return
@@ -157,7 +157,7 @@ func (h *RoomServiceHandler) Update(w http.ResponseWriter, r *http.Request) {
     }
 tenantID := *claims.TenantID
 
-    var req rs.UpdateRoomServiceRequest
+    var req rs.UpdateUnitServiceRequest
     if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
         http.Error(w, "invalid request body", http.StatusBadRequest)
         return
