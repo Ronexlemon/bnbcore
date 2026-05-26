@@ -4,7 +4,7 @@ import (
 	"time"
 
 	"github.com/ronexlemon/bnbcore/internal/domain/user"
-	uuid "github.com/satori/go.uuid"
+	"github.com/google/uuid"
 )
 
 type OnboardResult struct {

@@ -4,9 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+    "github.com/google/uuid"
 
 	"github.com/ronexlemon/bnbcore/internal/auth/password"
-	uuid "github.com/satori/go.uuid"
 )
 
 

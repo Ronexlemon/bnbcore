@@ -9,7 +9,7 @@ import (
 	"cloud.google.com/go/auth/credentials/idtoken"
 	"github.com/ronexlemon/bnbcore/internal/auth/password"
 	"github.com/ronexlemon/bnbcore/internal/auth/token"
-	"github.com/satori/go.uuid"
+	"github.com/google/uuid"
 )
 
 type UserService struct{

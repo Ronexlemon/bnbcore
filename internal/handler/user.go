@@ -178,22 +178,24 @@ func (h *UserHandler) GetMe(w http.ResponseWriter, r *http.Request) {
     writeJSON(w, map[string]any{"user": userResult})
 }
 
-
 func (h *UserHandler) issueTokens(w http.ResponseWriter, r *http.Request, usr *user.User) {
-    pair, err := h.JWTAuthManager.GenerateTokenPair(usr.ID, usr.Email, usr.Role, usr.Subdomain)
+    pair, err := h.JWTAuthManager.GenerateTokenPair(usr.ID, usr.TenantID, usr.Email, usr.Role, usr.Subdomain)
     if err != nil {
         http.Error(w, "could not generate tokens", http.StatusInternalServerError)
         return
     }
 
-    h.Service.StoreRefreshToken(
+    if err := h.Service.StoreRefreshToken(
         r.Context(),
         usr.ID,
         pair.RefreshToken,
         pair.RefreshClaims.IssuedAt.Time,
         false,
         pair.RefreshClaims.ExpiresAt.Time,
-    )
+    ); err != nil {
+        http.Error(w, "could not store refresh token", http.StatusInternalServerError)
+        return
+    }
 
     writeJSON(w, map[string]any{
         "access_token":  pair.AccessToken,

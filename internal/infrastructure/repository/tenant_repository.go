@@ -11,7 +11,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/ronexlemon/bnbcore/internal/domain/tenant"
 	"github.com/ronexlemon/bnbcore/internal/infrastructure/db"
-	uuid "github.com/satori/go.uuid"
+	"github.com/google/uuid"
 )
 
 
@@ -230,7 +230,7 @@ func (t *TenantRepository) CreateTenantWithOwner(
  
     // 3. Step 1: Create Tenant (Now bound to the transaction)
     newTenant := &tenant.Tenant{
-		ID:  uuid.NewV4(),
+		ID:  uuid.UUID(uuid.New()),
         Name:        tenantName,
         Subdomain:   subdomain,
         Status:      tenant.StatusTrial,

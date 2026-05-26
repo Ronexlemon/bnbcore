@@ -11,7 +11,7 @@ import (
 	"github.com/ronexlemon/bnbcore/internal/domain/tenant"
 	"github.com/ronexlemon/bnbcore/internal/domain/user"
 	"github.com/ronexlemon/bnbcore/internal/infrastructure/db"
-	"github.com/satori/go.uuid"
+	"github.com/google/uuid"
 	"google.golang.org/api/idtoken"
 )
 
@@ -395,7 +395,7 @@ func (u *UserRepository) LoginWithGoogle(ctx context.Context, googleClientID str
     }
 
     newUser := &user.User{
-        ID:           uuid.NewV4(),
+        ID:           uuid.UUID(uuid.New()),
         TenantID:     &t.ID,
         Email:        email,
         PasswordHash: "OAUTH_EXTERNAL_ACCOUNT",

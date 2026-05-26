@@ -1,22 +1,23 @@
 package app
 
 import (
-    "context"
-    "encoding/json"
-    "log"
-    "net/http"
-    "time"
+	"context"
+	"encoding/json"
+	"log"
+	"net/http"
+	"time"
 
-    "github.com/ronexlemon/bnbcore/internal/auth"
-    "github.com/ronexlemon/bnbcore/internal/auth/password"
-    "github.com/ronexlemon/bnbcore/internal/auth/token"
-    "github.com/ronexlemon/bnbcore/internal/config"
-    "github.com/ronexlemon/bnbcore/internal/domain/tenant"
-    "github.com/ronexlemon/bnbcore/internal/domain/user"
-    "github.com/ronexlemon/bnbcore/internal/handler"
-    "github.com/ronexlemon/bnbcore/internal/infrastructure/db"
-    "github.com/ronexlemon/bnbcore/internal/infrastructure/repository"
-
+	"github.com/ronexlemon/bnbcore/internal/auth"
+	"github.com/ronexlemon/bnbcore/internal/auth/password"
+	"github.com/ronexlemon/bnbcore/internal/auth/token"
+	"github.com/ronexlemon/bnbcore/internal/config"
+	"github.com/ronexlemon/bnbcore/internal/domain/booking"
+	"github.com/ronexlemon/bnbcore/internal/domain/tenant"
+	"github.com/ronexlemon/bnbcore/internal/domain/unit"
+	"github.com/ronexlemon/bnbcore/internal/domain/user"
+	"github.com/ronexlemon/bnbcore/internal/handler"
+	"github.com/ronexlemon/bnbcore/internal/infrastructure/db"
+	"github.com/ronexlemon/bnbcore/internal/infrastructure/repository"
 )
 
 func NewMuxService(ctx context.Context) http.Handler { 
@@ -50,6 +51,14 @@ func NewMuxService(ctx context.Context) http.Handler {
     if err != nil {
         log.Fatalf("Failed to initialize user repository: %v", err)
     }
+	unit_repo, err:= repository.NewUnitRepository(conn)
+    if err != nil {
+        log.Fatalf("Failed to initialize unit repository: %v", err)
+    }
+	booking_repo, err:= repository.NewBookingRepository(conn)
+    if err != nil {
+        log.Fatalf("Failed to initialize booking repository: %v", err)
+    }
 
     passwordEngine, err := password.NewPasswordHasher(peppers, config_env.ACTIVE_PEPPER_VERSION)
     if err != nil {
@@ -62,10 +71,14 @@ func NewMuxService(ctx context.Context) http.Handler {
     }
 
     tenant_service := tenant.NewService(tenant_repo, passwordEngine)
+	unit_service := unit.NewUnitService(unit_repo)
+	booking_service := booking.NewBookingService(booking_repo)
     user_service := user.NewUserservice(user_repo, passwordEngine, tokenEngine, config_env.GOOGLE_CLIENT_ID)
 
     _ = handler.NewTenantHandler(mux, tenant_service, jwtManager)
     _ = handler.NewUserHandler(mux, user_service, jwtManager,config_env.BASE_DOMAIN)
+	 _ = handler.NewUnitHandler(mux, unit_service, jwtManager)
+	  _ = handler.NewBookingHandler(mux, booking_service, jwtManager)
 
     return auth.SubdomainResolver(tenant_service, config_env.BASE_DOMAIN)(mux)
 }
