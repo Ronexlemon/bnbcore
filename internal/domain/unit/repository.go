@@ -1,4 +1,4 @@
-package units
+package unit
 import (
     "context"
     "github.com/google/uuid"
