@@ -2,25 +2,29 @@ package handler
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 
 	"github.com/google/uuid"
 	"github.com/ronexlemon/bnbcore/internal/auth"
 	"github.com/ronexlemon/bnbcore/internal/domain/booking"
 	"github.com/ronexlemon/bnbcore/internal/domain/tenant"
+	"github.com/ronexlemon/bnbcore/internal/eventstream"
 )
 
 type BookingHandler struct {
 	Server         *http.ServeMux
 	Service        *booking.BookingService
 	JWTAuthManager *auth.JwtManager
+	 Stream         *eventstream.KafkaClient
 }
 
-func NewBookingHandler(server *http.ServeMux, service *booking.BookingService, m *auth.JwtManager) *BookingHandler {
+func NewBookingHandler(server *http.ServeMux, service *booking.BookingService, m *auth.JwtManager,stream *eventstream.KafkaClient) *BookingHandler {
 	h := &BookingHandler{
 		Server:         server,
 		Service:        service,
 		JWTAuthManager: m,
+		Stream: stream,
 	}
 	h.registerRoutes()
 	return h
@@ -65,6 +69,27 @@ func (h *BookingHandler) CreateBooking(w http.ResponseWriter, r *http.Request) {
 	result, err := h.Service.CreateBooking(r.Context(), uuid.UUID(t.ID), req)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	err = h.Stream.Publish(r.Context(), eventstream.TopicBookingCreated, result.ID.String(),
+        eventstream.BookingCreatedEvent{
+            BookingID:  result.ID,
+            TenantID:   result.TenantID,
+            UnitID:     result.UnitID,
+            GuestName:  result.GuestName,
+            GuestEmail: result.GuestEmail,
+            GuestPhone: result.GuestPhone,
+            StartDate:  result.StartDate,
+            EndDate:    result.EndDate,
+            TotalPrice: result.TotalPrice,
+            ShopName:   t.Name,
+            CreatedAt:  result.CreatedAt,
+        },
+    )
+	if err !=nil{
+		fmt.Println("The Error for event",err)
+		http.Error(w, err.Error(), http.StatusConflict)
 		return
 	}
 
@@ -191,6 +216,23 @@ func (h *BookingHandler) UpdateStatus(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+
+
+	if req.Status == booking.BookingStatusConfirmed || req.Status == booking.BookingStatusCanceled {
+        topic := eventstream.TopicBookingConfirmed
+        if req.Status == booking.BookingStatusCanceled {
+            topic = eventstream.TopicBookingCanceled
+        }
+        _ = h.Stream.Publish(r.Context(), topic, result.ID.String(),
+            eventstream.BookingStatusEvent{
+                BookingID:  result.ID,
+                TenantID:   result.TenantID,
+                GuestName:  result.GuestName,
+                GuestPhone: result.GuestPhone,
+                Status:     string(req.Status),
+            },
+        )
+    }
 
 	writeJSON(w, map[string]any{
 		"message": "booking status updated",

@@ -16,16 +16,23 @@ import (
 	"github.com/ronexlemon/bnbcore/internal/domain/tenant"
 	"github.com/ronexlemon/bnbcore/internal/domain/unit"
 	"github.com/ronexlemon/bnbcore/internal/domain/user"
+	"github.com/ronexlemon/bnbcore/internal/eventstream"
 	"github.com/ronexlemon/bnbcore/internal/handler"
 	"github.com/ronexlemon/bnbcore/internal/infrastructure/db"
 	"github.com/ronexlemon/bnbcore/internal/infrastructure/repository"
+	"github.com/ronexlemon/bnbcore/internal/worker"
 )
 
 func NewMuxService(ctx context.Context) http.Handler { 
     config_env := config.Load()
+	rpConfig := config.LoadKafkaConfig()
+	stream, err := eventstream.NewKafkaClient(rpConfig.Brokers)
+    if err != nil {
+        log.Fatalf("failed to init event stream: %v", err)
+    }
 
     var peppers map[string]string
-    err := json.Unmarshal([]byte(config_env.PASSWORD_PEPPERS), &peppers)
+    err = json.Unmarshal([]byte(config_env.PASSWORD_PEPPERS), &peppers)
     if err != nil {
         log.Fatalf("Critical error parsing PASSWORD_PEPPERS JSON structure: %v", err)
     }
@@ -85,8 +92,19 @@ func NewMuxService(ctx context.Context) http.Handler {
      _ = handler.NewTenantHandler(mux, tenant_service, jwtManager)
      _ = handler.NewUserHandler(mux, user_service, jwtManager,config_env.BASE_DOMAIN)
 	 _ = handler.NewUnitHandler(mux, unit_service, jwtManager)
-	 _ = handler.NewBookingHandler(mux, booking_service, jwtManager)
+	 _ = handler.NewBookingHandler(mux, booking_service, jwtManager,stream)
 	 _ = handler.NewRoomServiceHandler(mux,unit_service_service, jwtManager)
+
+	  waWorker := worker.NewBookingNotificationWorker(stream, worker.WhatsAppConfig{
+        AccountSID: config_env.TWILIO_ACCOUNT_SID,
+        AuthToken:  config_env.TWILIO_AUTH_TOKEN,
+        FromNumber: config_env.TWILIO_WHATSAPP_FROM,
+    })
+    go func() {
+        if err := waWorker.Start(ctx); err != nil {
+            log.Printf("booking notification worker stopped: %v", err)
+        }
+    }()
 
     return auth.SubdomainResolver(tenant_service, config_env.BASE_DOMAIN)(mux)
 }
