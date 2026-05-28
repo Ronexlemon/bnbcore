@@ -24,7 +24,7 @@ CREATE TABLE subscriptions (
     status               subscription_status DEFAULT 'trial',
     amount               NUMERIC NOT NULL,
     currency             TEXT DEFAULT 'KES',
-    billing_cycle TEXT NOT NULL DEFAULT 'monthly'
+    billing_cycle TEXT NOT NULL DEFAULT 'monthly',
     current_period_start TIMESTAMP,
     current_period_end   TIMESTAMP,
     created_at           TIMESTAMP DEFAULT now()

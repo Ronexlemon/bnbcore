@@ -7,21 +7,25 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/ronexlemon/bnbcore/internal/auth"
+	"github.com/ronexlemon/bnbcore/internal/domain/subscription"
 	"github.com/ronexlemon/bnbcore/internal/domain/tenant"
 	"github.com/ronexlemon/bnbcore/internal/domain/unit"
+	"github.com/ronexlemon/bnbcore/internal/middleware"
 )
 
 type UnitHandler struct {
 	Server         *http.ServeMux
 	Service        *unit.UnitService
 	JWTAuthManager *auth.JwtManager
+	SubRepo        subscription.Repository
 }
 
-func NewUnitHandler(server *http.ServeMux, service *unit.UnitService, m *auth.JwtManager) *UnitHandler {
+func NewUnitHandler(server *http.ServeMux, service *unit.UnitService, m *auth.JwtManager,sub subscription.Repository) *UnitHandler {
 	h := &UnitHandler{
 		Server:         server,
 		Service:        service,
 		JWTAuthManager: m,
+		SubRepo: sub,
 	}
 	h.registerRoutes()
 	return h
@@ -30,23 +34,26 @@ func NewUnitHandler(server *http.ServeMux, service *unit.UnitService, m *auth.Jw
 func (h *UnitHandler) registerRoutes() {
 	api := "/api/v1"
 
+	protected := func(hf http.HandlerFunc) http.Handler {
+		return h.JWTAuthManager.Authenticate(
+			middleware.RequireActiveSubscription(h.SubRepo)(hf),
+		)
+	}
+	
 	h.Server.HandleFunc("GET "+api+"/units", h.GetAllUnits)
 	h.Server.HandleFunc("GET "+api+"/units/{id}", h.GetUnit)
 
-	h.Server.Handle("POST "+api+"/units",
-		h.JWTAuthManager.Authenticate(http.HandlerFunc(h.CreateUnit)))
+	h.Server.Handle("POST "+api+"/units",protected(h.CreateUnit))
 
-	h.Server.Handle("PUT "+api+"/units/{id}",
-		h.JWTAuthManager.Authenticate(http.HandlerFunc(h.UpdateUnit)))
 
-	h.Server.Handle("DELETE "+api+"/units/{id}",
-		h.JWTAuthManager.Authenticate(http.HandlerFunc(h.DeleteUnit)))
+	h.Server.Handle("PUT "+api+"/units/{id}",protected(h.UpdateUnit))
 
-	h.Server.Handle("POST "+api+"/units/{id}/images",
-		h.JWTAuthManager.Authenticate(http.HandlerFunc(h.AddImage)))
+	h.Server.Handle("DELETE "+api+"/units/{id}",protected((h.DeleteUnit)))
 
-	h.Server.Handle("DELETE "+api+"/units/{id}/images/{image_id}",
-		h.JWTAuthManager.Authenticate(http.HandlerFunc(h.RemoveImage)))
+	h.Server.Handle("POST "+api+"/units/{id}/images",protected(h.AddImage))
+
+	h.Server.Handle("DELETE "+api+"/units/{id}/images/{image_id}",protected(h.RemoveImage))
+
 }
 
 func (h *UnitHandler) CreateUnit(w http.ResponseWriter, r *http.Request) {

@@ -6,20 +6,24 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/ronexlemon/bnbcore/internal/auth"
-  rs	"github.com/ronexlemon/bnbcore/internal/domain/services"
+	rs "github.com/ronexlemon/bnbcore/internal/domain/services"
+	"github.com/ronexlemon/bnbcore/internal/domain/subscription"
+	"github.com/ronexlemon/bnbcore/internal/middleware"
 )
 
 type RoomServiceHandler struct {
     Server         *http.ServeMux
     Service        *rs.Service
     JWTAuthManager *auth.JwtManager
+	SubRepo        subscription.Repository
 }
 
-func NewRoomServiceHandler(server *http.ServeMux, service *rs.Service, m *auth.JwtManager) *RoomServiceHandler {
+func NewRoomServiceHandler(server *http.ServeMux, service *rs.Service, m *auth.JwtManager,sub  subscription.Repository) *RoomServiceHandler {
     h := &RoomServiceHandler{
         Server:         server,
         Service:        service,
         JWTAuthManager: m,
+		SubRepo: sub,
     }
     h.registerRoutes()
     return h
@@ -28,8 +32,12 @@ func NewRoomServiceHandler(server *http.ServeMux, service *rs.Service, m *auth.J
 func (h *RoomServiceHandler) registerRoutes() {
     api := "/api/v1"
 
-    h.Server.Handle("POST "+api+"/units/{unit_id}/unit-services",
-        h.JWTAuthManager.Authenticate(http.HandlerFunc(h.Create)))
+	protected := func(hf http.HandlerFunc) http.Handler {
+		return h.JWTAuthManager.Authenticate(
+			middleware.RequireActiveSubscription(h.SubRepo)(hf),
+		)
+	}
+    h.Server.Handle("POST "+api+"/units/{unit_id}/unit-services",protected(h.Create))
 
     h.Server.Handle("GET "+api+"/units/{unit_id}/unit-services",
         h.JWTAuthManager.Authenticate(http.HandlerFunc(h.GetByUnit)))
@@ -40,8 +48,8 @@ func (h *RoomServiceHandler) registerRoutes() {
     h.Server.Handle("PUT "+api+"/unit-services/{id}",
         h.JWTAuthManager.Authenticate(http.HandlerFunc(h.Update)))
 
-    h.Server.Handle("DELETE "+api+"/unit-services/{id}",
-        h.JWTAuthManager.Authenticate(http.HandlerFunc(h.Delete)))
+    h.Server.Handle("DELETE "+api+"/unit-services/{id}",protected(h.Delete))
+       
 }
 
 func (h *RoomServiceHandler) Create(w http.ResponseWriter, r *http.Request) {

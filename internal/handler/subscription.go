@@ -3,10 +3,9 @@ package handler
 import (
 	"encoding/json"
 	"net/http"
-
-	"github.com/google/uuid"
 	"github.com/ronexlemon/bnbcore/internal/auth"
 	"github.com/ronexlemon/bnbcore/internal/domain/subscription"
+	"github.com/ronexlemon/bnbcore/internal/domain/tenant"
 )
 
 type SubscriptionHandler struct {
@@ -67,11 +66,14 @@ func (h *SubscriptionHandler) Subscribe(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	tenantID, err := uuid.Parse(claims.TenantID.String())
-	if err != nil {
-		http.Error(w, "invalid tenant", http.StatusBadRequest)
-		return
+	tenant := tenant.FromContext(r.Context())
+	if tenant.ID ==nil{
+		 http.Error(w,"complete workspace setup first" ,http.StatusPreconditionRequired)
+        return
+
 	}
+
+	tenantID :=*tenant.ID
 
 	result, err := h.Service.Subscribe(r.Context(), tenantID, req)
 	if err != nil {
@@ -93,11 +95,15 @@ func (h *SubscriptionHandler) GetMySubscription(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	tenantID, err := uuid.Parse(claims.TenantID.String())
-	if err != nil {
-		http.Error(w, "invalid tenant", http.StatusBadRequest)
-		return
+	tenant := tenant.FromContext(r.Context())
+	if tenant.ID ==nil{
+		 http.Error(w,"complete workspace setup first" ,http.StatusPreconditionRequired)
+        return
+
 	}
+
+	tenantID :=*tenant.ID
+
 
 	result, err := h.Service.GetMySubscription(r.Context(), tenantID)
 	if err != nil {
@@ -122,11 +128,15 @@ func (h *SubscriptionHandler) Upgrade(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tenantID, err := uuid.Parse(claims.TenantID.String())
-	if err != nil {
-		http.Error(w, "invalid tenant", http.StatusBadRequest)
-		return
+	tenant := tenant.FromContext(r.Context())
+	if tenant.ID ==nil{
+		 http.Error(w,"complete workspace setup first" ,http.StatusPreconditionRequired)
+        return
+
 	}
+
+	tenantID :=*tenant.ID
+
 
 	result, err := h.Service.Upgrade(r.Context(), tenantID, req)
 	if err != nil {
@@ -148,11 +158,15 @@ func (h *SubscriptionHandler) Cancel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tenantID, err := uuid.Parse(claims.TenantID.String())
-	if err != nil {
-		http.Error(w, "invalid tenant", http.StatusBadRequest)
-		return
+	tenant := tenant.FromContext(r.Context())
+	if tenant.ID ==nil{
+		 http.Error(w,"complete workspace setup first" ,http.StatusPreconditionRequired)
+        return
+
 	}
+
+	tenantID :=*tenant.ID
+
 
 	if err := h.Service.Cancel(r.Context(), tenantID); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)

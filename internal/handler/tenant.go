@@ -6,7 +6,9 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/ronexlemon/bnbcore/internal/auth"
+	"github.com/ronexlemon/bnbcore/internal/domain/subscription"
 	"github.com/ronexlemon/bnbcore/internal/domain/tenant"
+	//"github.com/ronexlemon/bnbcore/internal/middleware"
 )
 
 type RegisterTenantRequest struct {
@@ -21,13 +23,15 @@ type TenantHandler struct {
 	Server         *http.ServeMux
 	Service        *tenant.Service
 	JWTAuthManager *auth.JwtManager
+	SubRepo        subscription.Repository
 }
 
-func NewTenantHandler(server *http.ServeMux, service *tenant.Service, m *auth.JwtManager) *TenantHandler {
+func NewTenantHandler(server *http.ServeMux, service *tenant.Service, m *auth.JwtManager,sub subscription.Repository) *TenantHandler {
 	h := &TenantHandler{
 		Server:         server,
 		Service:        service,
 		JWTAuthManager: m,
+		SubRepo: sub,
 	}
 	h.registerHandler()
 	return h
@@ -36,6 +40,11 @@ func NewTenantHandler(server *http.ServeMux, service *tenant.Service, m *auth.Jw
 func (h *TenantHandler) registerHandler() {
 	api := "/api/v1"
 
+	// protected := func(hf http.HandlerFunc) http.Handler {
+	// 	return h.JWTAuthManager.Authenticate(
+	// 		middleware.RequireActiveSubscription(h.SubRepo)(hf),
+	// 	)
+	// }
 	h.Server.Handle("POST "+api+"/tenant",
 		h.JWTAuthManager.Authenticate(http.HandlerFunc(h.CreateTenant)))
 

@@ -95,11 +95,11 @@ func NewMuxService(ctx context.Context) http.Handler {
 	booking_service := booking.NewBookingService(booking_repo)
     user_service := user.NewUserservice(user_repo, passwordEngine, tokenEngine, config_env.GOOGLE_CLIENT_ID)
 
-     _ = handler.NewTenantHandler(mux, tenant_service, jwtManager)
+     _ = handler.NewTenantHandler(mux, tenant_service, jwtManager,subscription_repo)
      _ = handler.NewUserHandler(mux, user_service, jwtManager,config_env.BASE_DOMAIN)
-	 _ = handler.NewUnitHandler(mux, unit_service, jwtManager)
-	 _ = handler.NewBookingHandler(mux, booking_service, jwtManager,stream)
-	 _ = handler.NewRoomServiceHandler(mux,unit_service_service, jwtManager)
+	 _ = handler.NewUnitHandler(mux, unit_service, jwtManager,subscription_repo)
+	 _ = handler.NewBookingHandler(mux, booking_service, jwtManager,stream,subscription_repo)
+	 _ = handler.NewRoomServiceHandler(mux,unit_service_service, jwtManager,subscription_repo)
 	 _ = handler.NewSubscriptionHandler(mux,sunscription_service, jwtManager)
 
 	  waWorker := worker.NewBookingNotificationWorker(stream, worker.WhatsAppConfig{
@@ -107,10 +107,14 @@ func NewMuxService(ctx context.Context) http.Handler {
         AuthToken:  config_env.TWILIO_AUTH_TOKEN,
         FromNumber: config_env.TWILIO_WHATSAPP_FROM,
     })
+	subWorker := worker.NewSubscriptionExpiryWorker(subscription_repo,time.Duration(time.Second *30))
     go func() {
         if err := waWorker.Start(ctx); err != nil {
             log.Printf("booking notification worker stopped: %v", err)
         }
+    }()
+	 go func() {
+        subWorker.Start(ctx)
     }()
 
     return auth.SubdomainResolver(tenant_service, config_env.BASE_DOMAIN)(mux)

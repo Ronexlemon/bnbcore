@@ -177,4 +177,54 @@ func (s *SubscriptionRepository) UpdateStatus(ctx context.Context, id uuid.UUID,
 	return nil
 }
 
+func (s *SubscriptionRepository) GetExpired(ctx context.Context) ([]*subscription.Subscription, error) {
+	rows, err := s.DbConnection.Pool.Query(ctx, `
+		SELECT id, tenant_id, plan, billing_cycle, status, amount, currency,
+		       current_period_start, current_period_end, created_at
+		FROM subscriptions
+		WHERE status IN ('active', 'trial')
+		  AND current_period_end < NOW()
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch expired subscriptions: %w", err)
+	}
+	defer rows.Close()
+
+	var subs []*subscription.Subscription
+	for rows.Next() {
+		var sub subscription.Subscription
+		if err := rows.Scan(
+			&sub.ID,
+			&sub.TenantID,
+			&sub.Plan,
+			&sub.BillingCycle,
+			&sub.Status,
+			&sub.Amount,
+			&sub.Currency,
+			&sub.CurrentPeriodStart,
+			&sub.CurrentPeriodEnd,
+			&sub.CreatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("failed to scan subscription: %w", err)
+		}
+		subs = append(subs, &sub)
+	}
+	return subs, nil
+}
+
+func (s *SubscriptionRepository) IsActive(ctx context.Context, tenantID uuid.UUID) (bool, error) {
+	var active bool
+	err := s.DbConnection.Pool.QueryRow(ctx, `
+		SELECT EXISTS (
+			SELECT 1 FROM subscriptions
+			WHERE tenant_id = $1
+			  AND status IN ('active', 'trial')
+			  AND current_period_end > NOW()
+		)
+	`, tenantID).Scan(&active)
+	if err != nil {
+		return false, fmt.Errorf("failed to check subscription: %w", err)
+	}
+	return active, nil
+}
 var _ subscription.Repository = (*SubscriptionRepository)(nil)

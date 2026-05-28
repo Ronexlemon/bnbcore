@@ -7,8 +7,10 @@ import (
 	"github.com/google/uuid"
 	"github.com/ronexlemon/bnbcore/internal/auth"
 	"github.com/ronexlemon/bnbcore/internal/domain/booking"
+	"github.com/ronexlemon/bnbcore/internal/domain/subscription"
 	"github.com/ronexlemon/bnbcore/internal/domain/tenant"
 	"github.com/ronexlemon/bnbcore/internal/eventstream"
+	"github.com/ronexlemon/bnbcore/internal/middleware"
 )
 
 type BookingHandler struct {
@@ -16,14 +18,16 @@ type BookingHandler struct {
 	Service        *booking.BookingService
 	JWTAuthManager *auth.JwtManager
 	 Stream         *eventstream.KafkaClient
+	 SubRepo        subscription.Repository
 }
 
-func NewBookingHandler(server *http.ServeMux, service *booking.BookingService, m *auth.JwtManager,stream *eventstream.KafkaClient) *BookingHandler {
+func NewBookingHandler(server *http.ServeMux, service *booking.BookingService, m *auth.JwtManager,stream *eventstream.KafkaClient,sub subscription.Repository) *BookingHandler {
 	h := &BookingHandler{
 		Server:         server,
 		Service:        service,
 		JWTAuthManager: m,
 		Stream: stream,
+		SubRepo: sub,
 	}
 	h.registerRoutes()
 	return h
@@ -31,11 +35,19 @@ func NewBookingHandler(server *http.ServeMux, service *booking.BookingService, m
 
 func (h *BookingHandler) registerRoutes() {
 	api := "/api/v1"
-
+protected_public := func(hf http.HandlerFunc) http.Handler {
+    return middleware.RequireActiveSubscription(h.SubRepo)(hf)
+}
 	h.Server.HandleFunc("GET "+api+"/units/{id}/availability", h.CheckAvailability)
-	h.Server.HandleFunc("POST "+api+"/bookings",h.CreateBooking)
+	h.Server.Handle("POST "+api+"/bookings",protected_public(h.CreateBooking))
 	h.Server.HandleFunc("GET "+api+"/units/{id}/booked-dates", h.GetBookedDates)
 
+	protected := func(hf http.HandlerFunc) http.Handler {
+		return h.JWTAuthManager.Authenticate(
+			middleware.RequireActiveSubscription(h.SubRepo)(hf),
+		)
+	}
+	
 	h.Server.Handle("GET "+api+"/bookings",
 		h.JWTAuthManager.Authenticate(http.HandlerFunc(h.GetAllBookings)))
 		
@@ -46,11 +58,10 @@ func (h *BookingHandler) registerRoutes() {
 	h.Server.Handle("GET "+api+"/units/{id}/bookings",
 		h.JWTAuthManager.Authenticate(http.HandlerFunc(h.GetBookingsByUnit)))
 
-	h.Server.Handle("PATCH "+api+"/bookings/{id}/status",
-		h.JWTAuthManager.Authenticate(http.HandlerFunc(h.UpdateStatus)))
-
-	h.Server.Handle("PATCH "+api+"/bookings/{id}/cancel",
-		h.JWTAuthManager.Authenticate(http.HandlerFunc(h.CancelBooking)))
+	h.Server.Handle("PATCH "+api+"/bookings/{id}/status",protected(h.UpdateStatus))
+	
+	h.Server.Handle("PATCH "+api+"/bookings/{id}/cancel",protected(h.CancelBooking))
+		
 }
 
 func (h *BookingHandler) CreateBooking(w http.ResponseWriter, r *http.Request) {
