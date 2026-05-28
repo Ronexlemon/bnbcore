@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/ronexlemon/bnbcore/internal/domain/notification"
 	"github.com/ronexlemon/bnbcore/internal/eventstream"
 )
 
@@ -22,12 +23,14 @@ type WhatsAppConfig struct {
 type BookingNotificationWorker struct {
 	Stream   *eventstream.KafkaClient
 	WhatsApp WhatsAppConfig
+	NotificationService *notification.Service
 }
 
-func NewBookingNotificationWorker(stream *eventstream.KafkaClient, wa WhatsAppConfig) *BookingNotificationWorker {
+func NewBookingNotificationWorker(stream *eventstream.KafkaClient, wa WhatsAppConfig,notification_service *notification.Service) *BookingNotificationWorker {
 	return &BookingNotificationWorker{
 		Stream:   stream,
 		WhatsApp: wa,
+		NotificationService: notification_service,
 	}
 }
 
@@ -64,6 +67,30 @@ func (w *BookingNotificationWorker) Start(ctx context.Context) error {
 }
 
 func (w *BookingNotificationWorker) handleBookingCreated(ctx context.Context, event eventstream.BookingCreatedEvent) {
+
+
+	notif, err := w.NotificationService.Create(ctx, notification.CreateNotificationRequest{
+		TenantID: &event.TenantID,
+		Type:     notification.TypeBookingCreated,
+		Channel:  notification.ChannelWhatsApp,
+		Title:    "New Booking Received",
+		Message: fmt.Sprintf("Hi! New booking from %s for %s (%s - %s)",
+			event.GuestName,
+			event.UnitTitle,
+			event.StartDate.Format("Jan 02"),
+			event.EndDate.Format("Jan 02"),
+		),
+		Metadata: map[string]any{
+			"booking_id":  event.BookingID,
+			"unit_id":     event.UnitID,
+			"guest_name":  event.GuestName,
+			"guest_phone": event.GuestPhone,
+			"total_price": event.TotalPrice,
+		},
+	})
+	if err != nil {
+		log.Printf("failed to save notification: %v", err)
+	}
 	if event.GuestPhone == "" {
 		log.Printf("no phone number for booking %s, skipping WhatsApp notification", event.BookingID)
 		return
@@ -84,8 +111,10 @@ func (w *BookingNotificationWorker) handleBookingCreated(ctx context.Context, ev
 
 	if err := w.sendWhatsApp(ctx, event.GuestPhone, message); err != nil {
 		log.Printf("failed to send WhatsApp for booking %s: %v", event.BookingID, err)
+		_ = w.NotificationService.MarkAsFailed(ctx, notif.ID, err.Error())
 		return
 	}
+	_ = w.NotificationService.MarkAsSent(ctx, notif.ID)
 
 	log.Printf("WhatsApp notification sent for booking %s to %s", event.BookingID, event.GuestPhone)
 }

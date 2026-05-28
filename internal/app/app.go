@@ -12,6 +12,7 @@ import (
 	"github.com/ronexlemon/bnbcore/internal/auth/token"
 	"github.com/ronexlemon/bnbcore/internal/config"
 	"github.com/ronexlemon/bnbcore/internal/domain/booking"
+	"github.com/ronexlemon/bnbcore/internal/domain/notification"
 	"github.com/ronexlemon/bnbcore/internal/domain/services"
 	"github.com/ronexlemon/bnbcore/internal/domain/subscription"
 	"github.com/ronexlemon/bnbcore/internal/domain/tenant"
@@ -77,6 +78,10 @@ func NewMuxService(ctx context.Context) http.Handler {
     if err != nil {
         log.Fatalf("Failed to initialize  Subscription repository: %v", err)
     }
+	notification_repo, err:= repository.NewNotificationRepository(conn)
+    if err != nil {
+        log.Fatalf("Failed to initialize  notification repository: %v", err)
+    }
 
     passwordEngine, err := password.NewPasswordHasher(peppers, config_env.ACTIVE_PEPPER_VERSION)
     if err != nil {
@@ -90,6 +95,7 @@ func NewMuxService(ctx context.Context) http.Handler {
 
     tenant_service := tenant.NewService(tenant_repo)
 	 sunscription_service := subscription.NewService(subscription_repo)
+	 notification_service := notification.NewService(notification_repo)
 	unit_service := unit.NewUnitService(unit_repo)
 	unit_service_service := services.NewService(unit_service_repo)
 	booking_service := booking.NewBookingService(booking_repo)
@@ -106,7 +112,7 @@ func NewMuxService(ctx context.Context) http.Handler {
         AccountSID: config_env.TWILIO_ACCOUNT_SID,
         AuthToken:  config_env.TWILIO_AUTH_TOKEN,
         FromNumber: config_env.TWILIO_WHATSAPP_FROM,
-    })
+    },notification_service)
 	subWorker := worker.NewSubscriptionExpiryWorker(subscription_repo,time.Duration(time.Second *30))
     go func() {
         if err := waWorker.Start(ctx); err != nil {
