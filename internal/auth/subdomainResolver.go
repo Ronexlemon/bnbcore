@@ -20,7 +20,7 @@ func SubdomainResolver(service *tenant.Service, baseDomain string) func(http.Han
                 return
             }
 fmt.Println("Finding Subdomain")
-            t, err := service.FindBySubdomain(r.Context(), sub)
+            t, err := service.GetTenantBySubdomain(r.Context(), sub)
             if err != nil || t == nil {
 				fmt.Println("No shop Found")
                 http.Error(w, "shop not found", http.StatusNotFound)

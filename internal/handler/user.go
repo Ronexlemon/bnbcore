@@ -24,8 +24,6 @@ type UserHandler struct {
 type RegisterRequest struct {
     Email     string `json:"email"`
     Password  string `json:"password"`
-    ShopName  string `json:"shop_name"`
-    Subdomain string `json:"subdomain"`
 }
 
 func NewUserHandler(server *http.ServeMux, service *user.UserService, manager *auth.JwtManager, base string) *UserHandler {
@@ -59,12 +57,9 @@ func (h *UserHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    if req.ShopName == "" || req.Subdomain == "" {
-        http.Error(w, "shop_name and subdomain are required", http.StatusBadRequest)
-        return
-    }
 
-    usr, err := h.Service.Register(r.Context(), req.Email, req.Password, req.ShopName, req.Subdomain)
+
+    usr, err := h.Service.Register(r.Context(), req.Email, req.Password)
     if err != nil {
         http.Error(w, err.Error(), http.StatusBadRequest)
         return
@@ -89,9 +84,6 @@ func (h *UserHandler) LoginHandler(w http.ResponseWriter, r *http.Request) {
     h.issueTokens(w, r, userResult)
 }
 
-// GoogleAuth — single endpoint for both register and login
-// New user:      POST /api/v1/auth/google  { credential, shop_name, subdomain }
-// Existing user: POST /api/v1/auth/google  { credential }
 func (h *UserHandler) GoogleAuth(w http.ResponseWriter, r *http.Request) {
     var req GoogleAuthRequest
     if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -169,7 +161,13 @@ func (h *UserHandler) GetMe(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    userResult, err := h.Service.GetUserByID(r.Context(), claims.UserID)
+	if claims.UserID == nil {
+        http.Error(w,"complete workspace setup first" ,http.StatusPreconditionRequired)
+        return
+    }
+userID := *claims.UserID
+
+    userResult, err := h.Service.GetUserByID(r.Context(), userID)
     if err != nil {
         http.Error(w, "user not found", http.StatusNotFound)
         return
@@ -179,7 +177,7 @@ func (h *UserHandler) GetMe(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *UserHandler) issueTokens(w http.ResponseWriter, r *http.Request, usr *user.User) {
-    pair, err := h.JWTAuthManager.GenerateTokenPair(usr.ID, usr.TenantID, usr.Email, usr.Role, usr.Subdomain)
+    pair, err := h.JWTAuthManager.GenerateTokenPair(&usr.ID,usr.Email, usr.Role)
     if err != nil {
         http.Error(w, "could not generate tokens", http.StatusInternalServerError)
         return
@@ -200,8 +198,6 @@ func (h *UserHandler) issueTokens(w http.ResponseWriter, r *http.Request, usr *u
     writeJSON(w, map[string]any{
         "access_token":  pair.AccessToken,
         "refresh_token": pair.RefreshToken,
-        "subdomain_url": fmt.Sprintf("https://%s.%s", usr.Subdomain, h.BaseUrl),
-        "shop_name":     usr.ShopName,
     })
 }
 

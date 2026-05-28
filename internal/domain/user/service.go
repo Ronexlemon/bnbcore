@@ -30,7 +30,7 @@ func NewUserservice(repo UserRepository,passEngine *password.PasswordHasher,toke
 }
 
 
-func (u *UserService) Register(ctx context.Context, email, password, shopName, subdomain string) (*User, error) {
+func (u *UserService) Register(ctx context.Context, email, password string) (*User, error) {
 
     
     exists, err := u.Repo.EmailExists(ctx, email)
@@ -41,27 +41,17 @@ func (u *UserService) Register(ctx context.Context, email, password, shopName, s
         return nil, errors.New("Invalid Credentials")
     }
 
-    taken, err := u.Repo.SubdomainExists(ctx, subdomain)
-    if err != nil {
-        return nil, fmt.Errorf("failed to check subdomain: %w", err)
-    }
-    if taken {
-        return nil, errors.New("subdomain already taken, please choose another")
-    }
-
-
     hashedPassword, err := u.PasswordEngine.Hash(password)
     if err != nil {
         return nil, err
     }
 
-    return u.Repo.Register(ctx, email, hashedPassword, shopName, subdomain)
+    return u.Repo.Register(ctx, email, hashedPassword)
 }
 
 
 func (u *UserService) RegisterWithGoogle(ctx context.Context, req GoogleLoginRequest, shopName, subdomain string) (*User, error) {
 
-    // 1. Validate Google token once here — never in the repo
     payload, err := idtoken.Validate(ctx, req.Credential, u.GoogleClientID)
     if err != nil {
         return nil, fmt.Errorf("invalid google token: %w", err)
@@ -72,29 +62,13 @@ func (u *UserService) RegisterWithGoogle(ctx context.Context, req GoogleLoginReq
         return nil, errors.New("google token missing email claim")
     }
 
-    // 2. Existing user — login flow
     existing, err := u.Repo.GetUserByEmail(ctx, email)
     if err == nil && existing != nil {
         existing.PasswordHash = ""
         return existing, nil
     }
 
-    // 3. New user — validate shop info
-    if shopName == "" || subdomain == "" {
-        return nil, errors.New("shop_name and subdomain are required for new accounts")
-    }
-
-    // 4. Check subdomain availability
-    taken, err := u.Repo.SubdomainExists(ctx, subdomain)
-    if err != nil {
-        return nil, fmt.Errorf("failed to check subdomain: %w", err)
-    }
-    if taken {
-        return nil, errors.New("subdomain already taken, please choose another")
-    }
-
-    // 5. Pass email directly — no credential needed in the repo
-    return u.Repo.GoogleRegister(ctx, email, shopName, subdomain)
+    return u.Repo.GoogleRegister(ctx, email)
 }
 func (u *UserService) Login(ctx context.Context,email,password string)(*User,error){
 	userResult, err := u.Repo.GetUserByEmail(ctx, email)
@@ -103,12 +77,8 @@ func (u *UserService) Login(ctx context.Context,email,password string)(*User,err
 		return nil, errors.New("invalid credentials")
 	}
 fmt.Println("Pass and email",password,email)
-hashedPassword, err := u.PasswordEngine.Hash(password)
-	if err != nil {
-		return nil,errors.New("An error")
-	}
+
 	fmt.Println("stored",userResult.PasswordHash)
-	fmt.Println(" new",hashedPassword)
 	fmt.Println(" results",userResult)
 	isValid, needsUpgrade := u.PasswordEngine.Compare(password, userResult.PasswordHash)
 	if !isValid {

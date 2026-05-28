@@ -83,7 +83,7 @@ func NewMuxService(ctx context.Context) http.Handler {
         log.Fatalf("master key and active encryptedHex need needed: %v", err)
     }
 
-    tenant_service := tenant.NewService(tenant_repo, passwordEngine)
+    tenant_service := tenant.NewService(tenant_repo)
 	unit_service := unit.NewUnitService(unit_repo)
 	unit_service_service := services.NewService(unit_service_repo)
 	booking_service := booking.NewBookingService(booking_repo)

@@ -210,12 +210,11 @@ func (b *BookingRepository) Cancel(ctx context.Context, id, tenantID uuid.UUID) 
 
 
 func (b *BookingRepository) CheckAvailability(ctx context.Context, unitID uuid.UUID, startDate, endDate time.Time) (bool, error) {
-	// Overlapping bookings: existing start < new end AND existing end > new start
 	query := `
 		SELECT EXISTS (
 			SELECT 1 FROM bookings
 			WHERE unit_id = $1
-			  AND status NOT IN ('canceled')
+			  AND status IN ('pending', 'confirmed')
 			  AND start_date < $3
 			  AND end_date   > $2
 		)
@@ -226,5 +225,35 @@ func (b *BookingRepository) CheckAvailability(ctx context.Context, unitID uuid.U
 		return false, fmt.Errorf("failed to check availability: %w", err)
 	}
 	return !overlaps, nil
+}
+func (b *BookingRepository) GetBookedDates(ctx context.Context, unitID uuid.UUID) ([]*booking.BookedRange, error) {
+	query := `
+		SELECT id, start_date, end_date, status
+		FROM bookings
+		WHERE unit_id = $1
+		  AND status IN ('pending', 'confirmed')
+		  AND end_date >= NOW()
+		ORDER BY start_date ASC
+	`
+	rows, err := b.DbConnection.Pool.Query(ctx, query, unitID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch booked dates: %w", err)
+	}
+	defer rows.Close()
+
+	var ranges []*booking.BookedRange
+	for rows.Next() {
+		var br booking.BookedRange
+		if err := rows.Scan(
+			&br.BookingID,
+			&br.StartDate,
+			&br.EndDate,
+			&br.Status,
+		); err != nil {
+			return nil, fmt.Errorf("failed to scan booked range: %w", err)
+		}
+		ranges = append(ranges, &br)
+	}
+	return ranges, nil
 }
 var _ booking.BookingRepository = (*BookingRepository)(nil)

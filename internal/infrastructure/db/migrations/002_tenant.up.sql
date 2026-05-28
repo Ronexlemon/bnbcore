@@ -36,13 +36,12 @@ CREATE TABLE platform_settings (
 -- =========================
 
 CREATE TABLE tenants (
-    id UUID PRIMARY KEY,
-    name TEXT NOT NULL,
-    subdomain TEXT UNIQUE NOT NULL,
-
-    status tenant_status DEFAULT 'trial',
-
-    trial_ends_at TIMESTAMP NOT NULL,
-
-    created_at TIMESTAMP DEFAULT now()
+    id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id       UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    name          TEXT NOT NULL,
+    subdomain     TEXT UNIQUE NOT NULL,
+    shop_description TEXT NOT NULL,
+    status        tenant_status DEFAULT 'trial',
+    trial_ends_at TIMESTAMP NOT NULL DEFAULT now() + INTERVAL '14 days',
+    created_at    TIMESTAMP DEFAULT now()
 );

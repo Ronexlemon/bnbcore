@@ -4,70 +4,197 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/google/uuid"
 	"github.com/ronexlemon/bnbcore/internal/auth"
 	"github.com/ronexlemon/bnbcore/internal/domain/tenant"
 )
 
 type RegisterTenantRequest struct {
-	ShopName   string `json:"shop_name"`
-	Subdomain  string `json:"subdomain"`
-	Email      string `json:"email"`
-	Password   string `json:"password"`
+	ShopDescription  string `json:"shop_description"`
+	Subdomain string `json:"subdomain"`
+	ShopName string `json:"name"`
 }
 
-type TenantHandler struct{
-	Server *http.ServeMux
-	Service *tenant.Service
+
+
+type TenantHandler struct {
+	Server         *http.ServeMux
+	Service        *tenant.Service
 	JWTAuthManager *auth.JwtManager
 }
 
-func NewTenantHandler(server *http.ServeMux,service *tenant.Service,m *auth.JwtManager)(*TenantHandler){
-	h:=&TenantHandler{
-		Server: server,
-		Service: service,
+func NewTenantHandler(server *http.ServeMux, service *tenant.Service, m *auth.JwtManager) *TenantHandler {
+	h := &TenantHandler{
+		Server:         server,
+		Service:        service,
 		JWTAuthManager: m,
 	}
 	h.registerHandler()
-
-	return  h
+	return h
 }
 
 func (h *TenantHandler) registerHandler() {
 	api := "/api/v1"
 
-	h.Server.Handle("POST "+api+"/tenant/register",
-		h.JWTAuthManager.Authenticate(http.HandlerFunc(h.RegisterTenantWithUser)))
+	h.Server.Handle("POST "+api+"/tenant",
+		h.JWTAuthManager.Authenticate(http.HandlerFunc(h.CreateTenant)))
+
+	h.Server.Handle("GET "+api+"/tenant",
+		h.JWTAuthManager.Authenticate(http.HandlerFunc(h.GetTenant)))
+
+	h.Server.Handle("PUT "+api+"/tenant/{id}",
+		h.JWTAuthManager.Authenticate(http.HandlerFunc(h.UpdateTenant)))
+
+	h.Server.Handle("DELETE "+api+"/tenant/{id}",
+		h.JWTAuthManager.Authenticate(http.HandlerFunc(h.DeleteTenant)))
+
+	h.Server.Handle("GET "+api+"/tenant/{id}",
+		h.JWTAuthManager.Authenticate(http.HandlerFunc(h.GetTenantByID)))
 }
 
-func (h *TenantHandler) RegisterTenantWithUser(w http.ResponseWriter, r *http.Request) {
-	var req RegisterTenantRequest
-
+func (h *TenantHandler) CreateTenant(w http.ResponseWriter, r *http.Request) {
 	claims := auth.ClaimsFromContext(r.Context())
 	if claims == nil {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
 
+	var req RegisterTenantRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
- 
-	//todo check if user exists
 
-	result, err := h.Service.CreateTenantWithOwner(
-		r.Context(),
-		claims.UserID,
-		req.Subdomain,
-		req.Subdomain,
-	)
+	if req.ShopDescription == "" || req.Subdomain == "" {
+		http.Error(w, "shop_name and subdomain are required", http.StatusBadRequest)
+		return
+	}
+
+	if claims.UserID == nil {
+        http.Error(w,"invalid user id" ,http.StatusBadRequest)
+        return
+    }
+userID := *claims.UserID
+
+
+	if err := h.Service.CreateTenant(r.Context(),req.ShopName ,req.ShopDescription, req.Subdomain, userID); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	w.WriteHeader(http.StatusCreated)
+	writeJSON(w, map[string]any{
+		"message": "tenant created successfully",
+	})
+}
+
+func (h *TenantHandler) GetTenant(w http.ResponseWriter, r *http.Request) {
+	claims := auth.ClaimsFromContext(r.Context())
+	if claims == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	if claims.UserID == nil {
+        http.Error(w,"invalid user id" ,http.StatusBadRequest)
+        return
+    }
+userID := *claims.UserID
+
+	result, err := h.Service.GetTenantByUserID(r.Context(), userID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+
+	writeJSON(w, map[string]any{
+		"data": result,
+	})
+}
+
+func (h *TenantHandler) GetTenantByID(w http.ResponseWriter, r *http.Request) {
+	claims := auth.ClaimsFromContext(r.Context())
+	if claims == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		http.Error(w, "invalid tenant id", http.StatusBadRequest)
+		return
+	}
+
+	result, err := h.Service.GetTenantByID(r.Context(), id)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+
+	writeJSON(w, map[string]any{
+		"data": result,
+	})
+}
+
+
+func (h *TenantHandler) UpdateTenant(w http.ResponseWriter, r *http.Request) {
+	claims := auth.ClaimsFromContext(r.Context())
+	if claims == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		http.Error(w, "invalid tenant id", http.StatusBadRequest)
+		return
+	}
+
+	var req tenant.UpdateTenantRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	var status *tenant.TenantStatus
+	if req.Status != nil {
+		s := tenant.TenantStatus(*req.Status)
+		status = &s
+	}
+
+	result, err := h.Service.UpdateTenant(r.Context(), id, tenant.UpdateTenantRequest{
+		ShopDescription:  req.ShopDescription,
+		Subdomain: req.Subdomain,
+		Status:    status,
+	})
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
 	writeJSON(w, map[string]any{
-		"message": "tenant created successfully",
-		"data":result,
+		"message": "tenant updated successfully",
+		"data":    result,
 	})
+}
+
+func (h *TenantHandler) DeleteTenant(w http.ResponseWriter, r *http.Request) {
+	claims := auth.ClaimsFromContext(r.Context())
+	if claims == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		http.Error(w, "invalid tenant id", http.StatusBadRequest)
+		return
+	}
+
+	if err := h.Service.DeleteTenant(r.Context(), id); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }

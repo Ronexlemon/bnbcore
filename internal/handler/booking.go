@@ -2,7 +2,6 @@ package handler
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 
 	"github.com/google/uuid"
@@ -35,6 +34,7 @@ func (h *BookingHandler) registerRoutes() {
 
 	h.Server.HandleFunc("GET "+api+"/units/{id}/availability", h.CheckAvailability)
 	h.Server.HandleFunc("POST "+api+"/bookings",h.CreateBooking)
+	h.Server.HandleFunc("GET "+api+"/units/{id}/booked-dates", h.GetBookedDates)
 
 	h.Server.Handle("GET "+api+"/bookings",
 		h.JWTAuthManager.Authenticate(http.HandlerFunc(h.GetAllBookings)))
@@ -66,7 +66,12 @@ func (h *BookingHandler) CreateBooking(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := h.Service.CreateBooking(r.Context(), uuid.UUID(t.ID), req)
+	if t.ID == nil {
+        http.Error(w,"complete workspace setup first" ,http.StatusPreconditionRequired)
+        return
+    }
+tenantID := *t.ID
+	result, err := h.Service.CreateBooking(r.Context(), tenantID, req)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -83,15 +88,10 @@ func (h *BookingHandler) CreateBooking(w http.ResponseWriter, r *http.Request) {
             StartDate:  result.StartDate,
             EndDate:    result.EndDate,
             TotalPrice: result.TotalPrice,
-            ShopName:   t.Name,
+            ShopName:   t.ShopDescription,
             CreatedAt:  result.CreatedAt,
         },
     )
-	if err !=nil{
-		fmt.Println("The Error for event",err)
-		http.Error(w, err.Error(), http.StatusConflict)
-		return
-	}
 
 	w.WriteHeader(http.StatusCreated)
 	writeJSON(w, map[string]any{
@@ -124,6 +124,24 @@ func (h *BookingHandler) GetAllBookings(w http.ResponseWriter, r *http.Request) 
 	})
 }
 
+func (h *BookingHandler) GetBookedDates(w http.ResponseWriter, r *http.Request) {
+	unitID, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		http.Error(w, "invalid unit id", http.StatusBadRequest)
+		return
+	}
+
+	dates, err := h.Service.GetBookedDates(r.Context(), unitID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	writeJSON(w, map[string]any{
+		"unit_id": unitID,
+		"booked_dates": dates,
+	})
+}
 func (h *BookingHandler) GetBooking(w http.ResponseWriter, r *http.Request) {
 	claims := auth.ClaimsFromContext(r.Context())
 	if claims == nil {

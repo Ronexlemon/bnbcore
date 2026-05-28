@@ -9,11 +9,10 @@ import (
 )
 
 type Claims struct {
-	UserID    uuid.UUID  `json:"user_id"`
-	TenantID  *uuid.UUID `json:"tenant_id"` 
+	UserID    *uuid.UUID  `json:"user_id"`
 	Email     string     `json:"email"`
 	Role      string     `json:"role"`
-	Subdomain string     `json:"subdomain"`
+	TenantID  *uuid.UUID  `json:"tenant_id"`
 	jwt.RegisteredClaims
 }
 
@@ -38,13 +37,13 @@ func NewJwtManager(secret []byte, accessTokenDuration, refreshTokenDuration time
 }
 
 //
-func (m *JwtManager) GenerateTokenPair(userID uuid.UUID, tenantID *uuid.UUID, email, role, subdomain string) (*TokenPair, error) {
-	_, access, err := m.generateToken(userID, tenantID, email, role, subdomain, m.accessTokenDuration)
+func (m *JwtManager) GenerateTokenPair(userID *uuid.UUID, email, role string) (*TokenPair, error) {
+	_, access, err := m.generateToken(userID,  email, role, m.accessTokenDuration)
 	if err != nil {
 		return nil, err
 	}
 
-	refreshClaims, refresh, err := m.generateToken(userID, tenantID, "", "", subdomain, m.refreshTokenDuration)
+	refreshClaims, refresh, err := m.generateToken(userID,"", "", m.refreshTokenDuration)
 	if err != nil {
 		return nil, err
 	}
@@ -63,7 +62,7 @@ func (m *JwtManager) RefreshAccessToken(refreshToken, email, role, subdomain str
 		return nil, "", err
 	}
 	
-	return m.generateToken(claims.UserID, claims.TenantID, email, role, subdomain, m.accessTokenDuration)
+	return m.generateToken(claims.UserID, email, role, m.accessTokenDuration)
 }
 
 func (m *JwtManager) ValidateToken(tokenStr string) (*Claims, error) {
@@ -92,18 +91,15 @@ func (m *JwtManager) ValidateToken(tokenStr string) (*Claims, error) {
 
 
 func (m *JwtManager) generateToken(
-	userID uuid.UUID,
-	tenantID *uuid.UUID, 
-	email, role, subdomain string,
+	userID *uuid.UUID,
+	email, role string,
 	duration time.Duration,
 ) (*Claims, string, error) {
 	now := time.Now()
 	claims := &Claims{
 		UserID:    userID,
-		TenantID:  tenantID,
 		Email:     email,
 		Role:      role,
-		Subdomain: subdomain,
 		RegisteredClaims: jwt.RegisteredClaims{
 			Subject:   userID.String(),
 			IssuedAt:  jwt.NewNumericDate(now),

@@ -2,7 +2,6 @@ package handler
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"time"
 
@@ -63,14 +62,13 @@ func (h *UnitHandler) CreateUnit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
    
-	fmt.Println("Tenant ID",claims.TenantID)
-	fmt.Println("Tenant claims",claims)
+	tenant:=tenant.FromContext(r.Context())
 
-	if claims.TenantID == nil {
+	if tenant.ID == nil {
         http.Error(w,"complete workspace setup first" ,http.StatusPreconditionRequired)
         return
     }
-tenantID := *claims.TenantID
+tenantID := *tenant.ID
 
 	result, err := h.Service.CreateUnit(r.Context(), tenantID, req)
 	if err != nil {
@@ -87,15 +85,19 @@ tenantID := *claims.TenantID
 
 func (h *UnitHandler) GetAllUnits(w http.ResponseWriter, r *http.Request) {
 	t := tenant.FromContext(r.Context())
-	fmt.Println("Whats receiving Tenant from context",t)
+	
 	if t == nil {
 		http.Error(w, "tenant not found", http.StatusBadRequest)
 		return
 	}
 
-	fmt.Println("Tenant from context",t)
+	if t.ID == nil {
+        http.Error(w,"complete workspace setup first" ,http.StatusPreconditionRequired)
+        return
+    }
+tenantID := *t.ID
 	 
-	units, err := h.Service.GetAllUnits(r.Context(), uuid.UUID(t.ID))
+	units, err := h.Service.GetAllUnits(r.Context(), tenantID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -118,8 +120,13 @@ func (h *UnitHandler) GetUnit(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid unit id", http.StatusBadRequest)
 		return
 	}
+	if t.ID == nil {
+        http.Error(w,"complete workspace setup first" ,http.StatusPreconditionRequired)
+        return
+    }
+tenantID := *t.ID
 
-	result, err := h.Service.GetUnit(r.Context(), id, uuid.UUID(t.ID))
+	result, err := h.Service.GetUnit(r.Context(), id, tenantID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
@@ -149,11 +156,13 @@ func (h *UnitHandler) UpdateUnit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if claims.TenantID == nil {
+	tenant:=tenant.FromContext(r.Context())
+
+	if tenant.ID == nil {
         http.Error(w,"complete workspace setup first" ,http.StatusPreconditionRequired)
         return
     }
-tenantID := *claims.TenantID
+tenantID := *tenant.ID
 
 	result, err := h.Service.UpdateUnit(r.Context(), id, tenantID, req)
 	if err != nil {

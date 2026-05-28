@@ -29,6 +29,13 @@ type Booking struct {
     CreatedAt  time.Time
 }
 
+type BookedRange struct {
+	BookingID uuid.UUID     `json:"booking_id"`
+	StartDate time.Time     `json:"start_date"`
+	EndDate   time.Time     `json:"end_date"`
+	Status    BookingStatus `json:"status"`
+}
+
 type CreateBookingRequest struct {
     UnitID     uuid.UUID `json:"unit_id"`
     GuestName  string    `json:"guest_name"`

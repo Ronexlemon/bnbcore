@@ -21,8 +21,10 @@ const (
 )
 const TrialDays = 14
 type Tenant struct {
-	ID          uuid.UUID     `json:"id"`
-	Name        string       `json:"name"`
+	ID          *uuid.UUID     `json:"id"`
+	UserID      uuid.UUID   `json:"user_id"`
+	ShopName string `json:"name"`
+	ShopDescription        string       `json:"shop_description"`
 	Subdomain   string       `json:"subdomain"`
 	Status      TenantStatus `json:"status"`
 	TrialEndsAt time.Time    `json:"trial_ends_at"`
@@ -40,4 +42,10 @@ type OnboardResponse struct {
 	RefreshToken string      `json:"refresh_token"`
 	TokenType    string      `json:"token_type"`
 	ExpiresIn    int64       `json:"expires_in"`
+}
+type UpdateTenantRequest struct {
+	ShopDescription  *string       `json:"shop_description"`
+	Subdomain *string       `json:"subdomain"`
+	Status    *TenantStatus `json:"status"`
+	ShopName string `json:"name"`
 }

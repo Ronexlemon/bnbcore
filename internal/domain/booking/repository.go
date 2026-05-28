@@ -16,6 +16,7 @@ type BookingRepository interface {
     GetAll(ctx context.Context, tenantID uuid.UUID) ([]*Booking, error)
     GetByUnit(ctx context.Context, unitID, tenantID uuid.UUID) ([]*Booking, error)
     UpdateStatus(ctx context.Context, id, tenantID uuid.UUID, status BookingStatus) (*Booking, error)
+    GetBookedDates(ctx context.Context, unitID uuid.UUID) ([]*BookedRange, error)
     Cancel(ctx context.Context, id, tenantID uuid.UUID) error
     CheckAvailability(ctx context.Context, unitID uuid.UUID, startDate, endDate time.Time) (bool, error)
 }

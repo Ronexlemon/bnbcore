@@ -68,3 +68,6 @@ func (s *BookingService) UpdateStatus(ctx context.Context, id, tenantID uuid.UUI
 func (s *BookingService) CancelBooking(ctx context.Context, id, tenantID uuid.UUID) error {
     return s.Repo.Cancel(ctx, id, tenantID)
 }
+func (s *BookingService) GetBookedDates(ctx context.Context, unitID uuid.UUID) ([]*BookedRange, error) {
+	return s.Repo.GetBookedDates(ctx, unitID)
+}
