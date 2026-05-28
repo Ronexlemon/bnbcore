@@ -107,6 +107,7 @@ func NewMuxService(ctx context.Context) http.Handler {
 	 _ = handler.NewBookingHandler(mux, booking_service, jwtManager,stream,subscription_repo)
 	 _ = handler.NewRoomServiceHandler(mux,unit_service_service, jwtManager,subscription_repo)
 	 _ = handler.NewSubscriptionHandler(mux,sunscription_service, jwtManager)
+	 _ = handler.NewNotificationHandler(mux,notification_service, jwtManager)
 
 	  waWorker := worker.NewBookingNotificationWorker(stream, worker.WhatsAppConfig{
         AccountSID: config_env.TWILIO_ACCOUNT_SID,
