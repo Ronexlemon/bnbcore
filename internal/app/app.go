@@ -13,6 +13,7 @@ import (
 	"github.com/ronexlemon/bnbcore/internal/config"
 	"github.com/ronexlemon/bnbcore/internal/domain/booking"
 	"github.com/ronexlemon/bnbcore/internal/domain/services"
+	"github.com/ronexlemon/bnbcore/internal/domain/subscription"
 	"github.com/ronexlemon/bnbcore/internal/domain/tenant"
 	"github.com/ronexlemon/bnbcore/internal/domain/unit"
 	"github.com/ronexlemon/bnbcore/internal/domain/user"
@@ -72,6 +73,10 @@ func NewMuxService(ctx context.Context) http.Handler {
     if err != nil {
         log.Fatalf("Failed to initialize unit service repository: %v", err)
     }
+	subscription_repo, err:= repository.NewSubscriptionRepository(conn)
+    if err != nil {
+        log.Fatalf("Failed to initialize  Subscription repository: %v", err)
+    }
 
     passwordEngine, err := password.NewPasswordHasher(peppers, config_env.ACTIVE_PEPPER_VERSION)
     if err != nil {
@@ -84,6 +89,7 @@ func NewMuxService(ctx context.Context) http.Handler {
     }
 
     tenant_service := tenant.NewService(tenant_repo)
+	 sunscription_service := subscription.NewService(subscription_repo)
 	unit_service := unit.NewUnitService(unit_repo)
 	unit_service_service := services.NewService(unit_service_repo)
 	booking_service := booking.NewBookingService(booking_repo)
@@ -94,6 +100,7 @@ func NewMuxService(ctx context.Context) http.Handler {
 	 _ = handler.NewUnitHandler(mux, unit_service, jwtManager)
 	 _ = handler.NewBookingHandler(mux, booking_service, jwtManager,stream)
 	 _ = handler.NewRoomServiceHandler(mux,unit_service_service, jwtManager)
+	 _ = handler.NewSubscriptionHandler(mux,sunscription_service, jwtManager)
 
 	  waWorker := worker.NewBookingNotificationWorker(stream, worker.WhatsAppConfig{
         AccountSID: config_env.TWILIO_ACCOUNT_SID,
