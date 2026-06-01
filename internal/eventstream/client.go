@@ -77,6 +77,9 @@ func (k *KafkaClient) ConsumeEvents(ctx context.Context, topics []string, groupI
 				record := iter.Next()
 				handler(record.Topic, record.Key, record.Value)
 			}
+			if err := cl.CommitUncommittedOffsets(ctx); err != nil {
+				log.Printf("failed to commit offsets: %v", err)
+			}
 		}
 	}
 }

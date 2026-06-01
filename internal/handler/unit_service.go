@@ -8,6 +8,7 @@ import (
 	"github.com/ronexlemon/bnbcore/internal/auth"
 	rs "github.com/ronexlemon/bnbcore/internal/domain/services"
 	"github.com/ronexlemon/bnbcore/internal/domain/subscription"
+	"github.com/ronexlemon/bnbcore/internal/eventstream"
 	"github.com/ronexlemon/bnbcore/internal/middleware"
 )
 
@@ -16,14 +17,16 @@ type RoomServiceHandler struct {
     Service        *rs.Service
     JWTAuthManager *auth.JwtManager
 	SubRepo        subscription.Repository
+	 Stream         *eventstream.KafkaClient
 }
 
-func NewRoomServiceHandler(server *http.ServeMux, service *rs.Service, m *auth.JwtManager,sub  subscription.Repository) *RoomServiceHandler {
+func NewRoomServiceHandler(server *http.ServeMux, service *rs.Service, m *auth.JwtManager,sub  subscription.Repository,stream  *eventstream.KafkaClient ) *RoomServiceHandler {
     h := &RoomServiceHandler{
         Server:         server,
         Service:        service,
         JWTAuthManager: m,
 		SubRepo: sub,
+		Stream: stream,
     }
     h.registerRoutes()
     return h

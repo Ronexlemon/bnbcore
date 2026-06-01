@@ -3,22 +3,26 @@ package handler
 import (
 	"encoding/json"
 	"net/http"
+
 	"github.com/ronexlemon/bnbcore/internal/auth"
 	"github.com/ronexlemon/bnbcore/internal/domain/subscription"
 	"github.com/ronexlemon/bnbcore/internal/domain/tenant"
+	"github.com/ronexlemon/bnbcore/internal/eventstream"
 )
 
 type SubscriptionHandler struct {
 	Server         *http.ServeMux
 	Service        *subscription.Service
 	JWTAuthManager *auth.JwtManager
+	 Stream         *eventstream.KafkaClient
 }
 
-func NewSubscriptionHandler(server *http.ServeMux, service *subscription.Service, m *auth.JwtManager) *SubscriptionHandler {
+func NewSubscriptionHandler(server *http.ServeMux, service *subscription.Service, m *auth.JwtManager,stream  *eventstream.KafkaClient ) *SubscriptionHandler {
 	h := &SubscriptionHandler{
 		Server:         server,
 		Service:        service,
 		JWTAuthManager: m,
+		Stream: stream,
 	}
 	h.registerRoutes()
 	return h

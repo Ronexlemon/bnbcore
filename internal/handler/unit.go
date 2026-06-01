@@ -10,6 +10,7 @@ import (
 	"github.com/ronexlemon/bnbcore/internal/domain/subscription"
 	"github.com/ronexlemon/bnbcore/internal/domain/tenant"
 	"github.com/ronexlemon/bnbcore/internal/domain/unit"
+	"github.com/ronexlemon/bnbcore/internal/eventstream"
 	"github.com/ronexlemon/bnbcore/internal/middleware"
 )
 
@@ -18,14 +19,16 @@ type UnitHandler struct {
 	Service        *unit.UnitService
 	JWTAuthManager *auth.JwtManager
 	SubRepo        subscription.Repository
+	Stream         *eventstream.KafkaClient
 }
 
-func NewUnitHandler(server *http.ServeMux, service *unit.UnitService, m *auth.JwtManager,sub subscription.Repository) *UnitHandler {
+func NewUnitHandler(server *http.ServeMux, service *unit.UnitService, m *auth.JwtManager,sub subscription.Repository,stream  *eventstream.KafkaClient) *UnitHandler {
 	h := &UnitHandler{
 		Server:         server,
 		Service:        service,
 		JWTAuthManager: m,
 		SubRepo: sub,
+		Stream: stream,
 	}
 	h.registerRoutes()
 	return h
@@ -52,7 +55,8 @@ func (h *UnitHandler) registerRoutes() {
 
 	h.Server.Handle("POST "+api+"/units/{id}/images",protected(h.AddImage))
 
-	h.Server.Handle("DELETE "+api+"/units/{id}/images/{image_id}",protected(h.RemoveImage))
+	h.Server.Handle("DELETE "+api+"/units/{id}/images/{image_id}",
+	 h.JWTAuthManager.Authenticate(http.HandlerFunc(h.RemoveImage)))
 
 }
 
@@ -82,6 +86,17 @@ tenantID := *tenant.ID
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	err = h.Stream.Publish(r.Context(), eventstream.TopicUnitCreated, result.ID.String(),
+    eventstream.UnitCreatedEvent{
+        BaseEvent: eventstream.BaseEvent{
+            TenantID:  *tenant.ID,
+            UserID:    *claims.UserID,
+            UserEmail: claims.Email,
+            OccuredAt: time.Now(),
+        },
+        Title: result.Title,
+    },
+)
 
 	w.WriteHeader(http.StatusCreated)
 	writeJSON(w, map[string]any{

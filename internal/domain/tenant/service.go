@@ -16,13 +16,13 @@ func NewService(repo Repository) *Service {
 	return &Service{repo: repo}
 }
 
-func (s *Service) CreateTenant(ctx context.Context, shopName,ShopDescription, subdomain string, userID uuid.UUID) error {
+func (s *Service) CreateTenant(ctx context.Context, shopName,ShopDescription, subdomain string, userID uuid.UUID) (*Tenant,error) {
 	exists, err := s.repo.SubdomainExists(ctx, subdomain)
 	if err != nil {
-		return fmt.Errorf("failed to check subdomain: %w", err)
+		return nil, fmt.Errorf("failed to check subdomain: %w", err)
 	}
 	if exists {
-		return errors.New("subdomain already taken")
+		return nil, errors.New("subdomain already taken")
 	}
 	return s.repo.CreateTenant(ctx, shopName,ShopDescription, subdomain, userID)
 }

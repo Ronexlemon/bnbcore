@@ -37,15 +37,28 @@ func NewTenantRepository(dbconnect *db.PostgresConn) (*TenantRepository, error) 
 
 
 
-func (t *TenantRepository) CreateTenant(ctx context.Context,ShopName ,ShopDescription, subdomain string, userID uuid.UUID) error {
-	_, err := t.DbConnection.Pool.Exec(ctx, `
-		INSERT INTO tenants (id, user_id,name,shop_description, subdomain, status, trial_ends_at, created_at)
-		VALUES (gen_random_uuid(), $1, $2, $3,$4, 'trial', NOW() + INTERVAL '14 days', NOW())
-	`, userID,ShopName ,ShopDescription, subdomain)
+func (t *TenantRepository) CreateTenant(ctx context.Context, shopName, shopDescription, subdomain string, userID uuid.UUID) (*tenant.Tenant, error) {
+	var tn tenant.Tenant
+
+	err := t.DbConnection.Pool.QueryRow(ctx, `
+		INSERT INTO tenants (id, user_id, name, shop_description, subdomain, status, trial_ends_at, created_at)
+		VALUES (gen_random_uuid(), $1, $2, $3, $4, 'trial', NOW() + INTERVAL '14 days', NOW())
+		RETURNING id, user_id, name, shop_description, subdomain, status, trial_ends_at, created_at
+	`, userID, shopName, shopDescription, subdomain).Scan(
+		&tn.ID,
+		&tn.UserID,
+		&tn.ShopName,
+		&tn.ShopDescription,
+		&tn.Subdomain,
+		&tn.Status,
+		&tn.TrialEndsAt,
+		&tn.CreatedAt,
+	)
 	if err != nil {
-		return fmt.Errorf("failed to create tenant: %w", err)
+		return nil, fmt.Errorf("failed to create tenant: %w", err)
 	}
-	return nil
+
+	return &tn, nil
 }
 
 

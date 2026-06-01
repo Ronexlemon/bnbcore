@@ -1,12 +1,13 @@
 package handler
 
 import (
-    "encoding/json"
-    "fmt"
-    "net/http"
+	"encoding/json"
+	"fmt"
+	"net/http"
 
-    "github.com/ronexlemon/bnbcore/internal/auth"
-    "github.com/ronexlemon/bnbcore/internal/domain/user"
+	"github.com/ronexlemon/bnbcore/internal/auth"
+	"github.com/ronexlemon/bnbcore/internal/domain/user"
+	"github.com/ronexlemon/bnbcore/internal/eventstream"
 )
 
 type GoogleAuthRequest struct {
@@ -20,18 +21,20 @@ type UserHandler struct {
     Service        *user.UserService
     JWTAuthManager *auth.JwtManager
     BaseUrl        string
+	Stream         *eventstream.KafkaClient
 }
 type RegisterRequest struct {
     Email     string `json:"email"`
     Password  string `json:"password"`
 }
 
-func NewUserHandler(server *http.ServeMux, service *user.UserService, manager *auth.JwtManager, base string) *UserHandler {
+func NewUserHandler(server *http.ServeMux, service *user.UserService, manager *auth.JwtManager, base string,stream  *eventstream.KafkaClient) *UserHandler {
     h := &UserHandler{
         Server:         server,
         Service:        service,
         JWTAuthManager: manager,
         BaseUrl:        base,
+		Stream: stream,
     }
     h.registerRoutes()
     return h

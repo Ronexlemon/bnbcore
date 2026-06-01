@@ -24,6 +24,11 @@ type Config struct {
 	TWILIO_ACCOUNT_SID string
 TWILIO_AUTH_TOKEN string
 TWILIO_WHATSAPP_FROM  string
+HOST string
+PORT string   
+USERNAME string
+PASSWORD string
+FROM string
 
 }
 
@@ -59,6 +64,11 @@ func Load() *Config {
 		TWILIO_ACCOUNT_SID:os.Getenv("TWILIO_ACCOUNT_SID"),
 		TWILIO_AUTH_TOKEN:os.Getenv("TWILIO_AUTH_TOKEN"),
 		TWILIO_WHATSAPP_FROM:os.Getenv("TWILIO_WHATSAPP_FROM"),
+		HOST:os.Getenv("HOST"),
+		PORT:os.Getenv("PORT"),
+		FROM:os.Getenv("FROM"),
+		PASSWORD:os.Getenv("PASSWORD"),
+		
 
 	}
 }

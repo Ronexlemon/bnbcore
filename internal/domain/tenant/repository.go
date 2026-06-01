@@ -8,7 +8,7 @@ import (
 
 type Repository interface {
 	
-	CreateTenant(ctx context.Context, shopName,ShopDescription, subdomain string, userID uuid.UUID) error
+	CreateTenant(ctx context.Context, shopName,ShopDescription, subdomain string, userID uuid.UUID)(*Tenant,error)
 	UpdateTenant(ctx context.Context, id uuid.UUID, req UpdateTenantRequest) (*Tenant, error)
 	DeleteTenant(ctx context.Context, id uuid.UUID) error
 

@@ -3,12 +3,13 @@ package handler
 import (
 	"encoding/json"
 	"net/http"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/ronexlemon/bnbcore/internal/auth"
 	"github.com/ronexlemon/bnbcore/internal/domain/subscription"
 	"github.com/ronexlemon/bnbcore/internal/domain/tenant"
-	//"github.com/ronexlemon/bnbcore/internal/middleware"
+	"github.com/ronexlemon/bnbcore/internal/eventstream"
 )
 
 type RegisterTenantRequest struct {
@@ -24,14 +25,16 @@ type TenantHandler struct {
 	Service        *tenant.Service
 	JWTAuthManager *auth.JwtManager
 	SubRepo        subscription.Repository
+		 Stream         *eventstream.KafkaClient
 }
 
-func NewTenantHandler(server *http.ServeMux, service *tenant.Service, m *auth.JwtManager,sub subscription.Repository) *TenantHandler {
+func NewTenantHandler(server *http.ServeMux, service *tenant.Service, m *auth.JwtManager,sub subscription.Repository,stream *eventstream.KafkaClient) *TenantHandler {
 	h := &TenantHandler{
 		Server:         server,
 		Service:        service,
 		JWTAuthManager: m,
 		SubRepo: sub,
+		Stream: stream,
 	}
 	h.registerHandler()
 	return h
@@ -86,10 +89,23 @@ func (h *TenantHandler) CreateTenant(w http.ResponseWriter, r *http.Request) {
 userID := *claims.UserID
 
 
-	if err := h.Service.CreateTenant(r.Context(),req.ShopName ,req.ShopDescription, req.Subdomain, userID); err != nil {
+	 tenant_details,err := h.Service.CreateTenant(r.Context(),req.ShopName ,req.ShopDescription, req.Subdomain, userID)
+	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+   _ = h.Stream.Publish(r.Context(), eventstream.TopicTenantCreated, tenant_details.ID.String(),
+    eventstream.TenantCreatedEvent{
+        BaseEvent: eventstream.BaseEvent{
+            TenantID:  *tenant_details.ID,
+            UserID:    userID,
+            UserEmail: claims.Email,
+            ShopName:  req.ShopName,
+            OccuredAt: time.Now(),
+        },
+        Subdomain: req.Subdomain,
+    },
+)
 
 	w.WriteHeader(http.StatusCreated)
 	writeJSON(w, map[string]any{
@@ -180,6 +196,30 @@ func (h *TenantHandler) UpdateTenant(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+
+	changes := map[string]any{}
+	if req.ShopDescription != nil {
+		changes["shop_description"] = *req.ShopDescription
+	}
+	if req.Subdomain != nil {
+		changes["subdomain"] = *req.Subdomain
+	}
+	if req.Status != nil {
+		changes["status"] = *req.Status
+	}
+
+	_ = h.Stream.Publish(r.Context(), eventstream.TopicTenantUpdated, result.ID.String(),
+		eventstream.TenantUpdatedEvent{
+			BaseEvent: eventstream.BaseEvent{
+				TenantID:  *result.ID,
+				UserID:    *claims.UserID,
+				UserEmail: claims.Email,
+				ShopName:  result.ShopName,
+				OccuredAt: time.Now(),
+			},
+			Changes: changes,
+		},
+	)
 
 	writeJSON(w, map[string]any{
 		"message": "tenant updated successfully",

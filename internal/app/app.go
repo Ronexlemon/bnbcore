@@ -6,7 +6,6 @@ import (
 	"log"
 	"net/http"
 	"time"
-
 	"github.com/ronexlemon/bnbcore/internal/auth"
 	"github.com/ronexlemon/bnbcore/internal/auth/password"
 	"github.com/ronexlemon/bnbcore/internal/auth/token"
@@ -22,12 +21,15 @@ import (
 	"github.com/ronexlemon/bnbcore/internal/handler"
 	"github.com/ronexlemon/bnbcore/internal/infrastructure/db"
 	"github.com/ronexlemon/bnbcore/internal/infrastructure/repository"
+	"github.com/ronexlemon/bnbcore/internal/senders"
 	"github.com/ronexlemon/bnbcore/internal/worker"
 )
 
 func NewMuxService(ctx context.Context) http.Handler { 
+	workerCtx := context.Background()
     config_env := config.Load()
 	rpConfig := config.LoadKafkaConfig()
+	sender :=senders.NewSender(senders.Config{Host: config_env.HOST,Port: config_env.PORT,From: config_env.FROM,Password: config_env.PASSWORD})
 	stream, err := eventstream.NewKafkaClient(rpConfig.Brokers)
     if err != nil {
         log.Fatalf("failed to init event stream: %v", err)
@@ -101,12 +103,12 @@ func NewMuxService(ctx context.Context) http.Handler {
 	booking_service := booking.NewBookingService(booking_repo)
     user_service := user.NewUserservice(user_repo, passwordEngine, tokenEngine, config_env.GOOGLE_CLIENT_ID)
 
-     _ = handler.NewTenantHandler(mux, tenant_service, jwtManager,subscription_repo)
-     _ = handler.NewUserHandler(mux, user_service, jwtManager,config_env.BASE_DOMAIN)
-	 _ = handler.NewUnitHandler(mux, unit_service, jwtManager,subscription_repo)
+     _ = handler.NewTenantHandler(mux, tenant_service, jwtManager,subscription_repo,stream)
+     _ = handler.NewUserHandler(mux, user_service, jwtManager,config_env.BASE_DOMAIN,stream)
+	 _ = handler.NewUnitHandler(mux, unit_service, jwtManager,subscription_repo,stream)
 	 _ = handler.NewBookingHandler(mux, booking_service, jwtManager,stream,subscription_repo)
-	 _ = handler.NewRoomServiceHandler(mux,unit_service_service, jwtManager,subscription_repo)
-	 _ = handler.NewSubscriptionHandler(mux,sunscription_service, jwtManager)
+	 _ = handler.NewRoomServiceHandler(mux,unit_service_service, jwtManager,subscription_repo,stream)
+	 _ = handler.NewSubscriptionHandler(mux,sunscription_service, jwtManager,stream)
 	 _ = handler.NewNotificationHandler(mux,notification_service, jwtManager)
 
 	  waWorker := worker.NewBookingNotificationWorker(stream, worker.WhatsAppConfig{
@@ -115,13 +117,20 @@ func NewMuxService(ctx context.Context) http.Handler {
         FromNumber: config_env.TWILIO_WHATSAPP_FROM,
     },notification_service)
 	subWorker := worker.NewSubscriptionExpiryWorker(subscription_repo,time.Duration(time.Second *30))
+	generalNotificationWorker := worker.NewNotificationWorker(stream,notification_service,sender)
     go func() {
-        if err := waWorker.Start(ctx); err != nil {
+        if err := waWorker.Start(workerCtx); err != nil {
             log.Printf("booking notification worker stopped: %v", err)
         }
     }()
 	 go func() {
-        subWorker.Start(ctx)
+        subWorker.Start(workerCtx)
+    }()
+	go func() {
+       
+		 if err :=  generalNotificationWorker.Start(workerCtx); err != nil {
+            log.Printf("general notification worker stopped: %v", err)
+        }
     }()
 
     return auth.SubdomainResolver(tenant_service, config_env.BASE_DOMAIN)(mux)
