@@ -86,7 +86,7 @@ tenantID := *tenant.ID
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	err = h.Stream.Publish(r.Context(), eventstream.TopicUnitCreated, result.ID.String(),
+	_ = h.Stream.Publish(r.Context(), eventstream.TopicUnitCreated, result.ID.String(),
     eventstream.UnitCreatedEvent{
         BaseEvent: eventstream.BaseEvent{
             TenantID:  *tenant.ID,

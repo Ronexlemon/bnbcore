@@ -4,6 +4,7 @@ CREATE TYPE unit_status AS ENUM (
     'active',
     'inactive',
     'deleted'
+    'maintenance'
 );
 
 CREATE TYPE booking_status AS ENUM (
@@ -11,6 +12,7 @@ CREATE TYPE booking_status AS ENUM (
     'confirmed',
     'canceled',
     'completed'
+    
 );
 
 -- =========================
@@ -22,6 +24,8 @@ CREATE TABLE units (
     tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE,
 
     title TEXT NOT NULL,
+    name TEXT NOT NULL,
+    type text NOT NULL,
     description TEXT,
 
     price_per_night NUMERIC NOT NULL,

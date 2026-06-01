@@ -21,8 +21,8 @@ func NewUnitRepository(dbconn *db.PostgresConn) (*UnitRepository,error) {
 
 func (u *UnitRepository) Create(ctx context.Context, un *unit.Unit) (*unit.Unit, error) {
     query := `
-        INSERT INTO units (id, tenant_id, title, description, price_per_night, location, latitude, longitude, status, created_at, updated_at)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())
+        INSERT INTO units (id, tenant_id, title, description,name,type, price_per_night, location, latitude, longitude, status, created_at, updated_at)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9,$10,$11, NOW(), NOW())
         RETURNING created_at, updated_at
     `
     err := u.DbConnection.Pool.QueryRow(ctx, query,
@@ -30,6 +30,8 @@ func (u *UnitRepository) Create(ctx context.Context, un *unit.Unit) (*unit.Unit,
         un.TenantID,
         un.Title,
         un.Description,
+		un.Name,
+		un.UnitType,
         un.PricePerNight,
         un.Location,
         un.Latitude,
@@ -47,7 +49,7 @@ func (u *UnitRepository) GetByID(ctx context.Context, id, tenantID uuid.UUID) (*
     var un unit.Unit
 
     query := `
-        SELECT id, tenant_id, title, description, price_per_night, location,
+        SELECT id, tenant_id, title, description,name,type, price_per_night, location,
                latitude, longitude, status, created_at, updated_at
         FROM units
         WHERE id = $1
@@ -59,6 +61,8 @@ func (u *UnitRepository) GetByID(ctx context.Context, id, tenantID uuid.UUID) (*
         &un.TenantID,
         &un.Title,
         &un.Description,
+		&un.Name,
+		&un.UnitType,
         &un.PricePerNight,
         &un.Location,
         &un.Latitude,
@@ -86,8 +90,9 @@ func (u *UnitRepository) GetByID(ctx context.Context, id, tenantID uuid.UUID) (*
 
 
 func (u *UnitRepository) GetAll(ctx context.Context, tenantID uuid.UUID) ([]*unit.Unit, error) {
+    
     query := `
-        SELECT id, tenant_id, title, description, price_per_night, location,
+        SELECT id, tenant_id, title, description, name, type, price_per_night, location,
                latitude, longitude, status, created_at, updated_at
         FROM units
         WHERE tenant_id = $1
@@ -108,6 +113,8 @@ func (u *UnitRepository) GetAll(ctx context.Context, tenantID uuid.UUID) ([]*uni
             &un.TenantID,
             &un.Title,
             &un.Description,
+            &un.Name,
+            &un.UnitType,
             &un.PricePerNight,
             &un.Location,
             &un.Latitude,
@@ -119,6 +126,11 @@ func (u *UnitRepository) GetAll(ctx context.Context, tenantID uuid.UUID) ([]*uni
             return nil, fmt.Errorf("failed to scan unit: %w", err)
         }
         units = append(units, &un)
+    }
+
+
+    if err := rows.Err(); err != nil {
+        return nil, fmt.Errorf("error during rows iteration: %w", err)
     }
 
     for _, un := range units {
@@ -138,22 +150,26 @@ func (u *UnitRepository) Update(ctx context.Context, id, tenantID uuid.UUID, req
         UPDATE units SET
             title          = COALESCE($1, title),
             description    = COALESCE($2, description),
-            price_per_night = COALESCE($3, price_per_night),
-            location       = COALESCE($4, location),
-            latitude       = COALESCE($5, latitude),
-            longitude      = COALESCE($6, longitude),
-            status         = COALESCE($7, status),
+			name    = COALESCE($3, name),
+			type    = COALESCE($4, type),
+            price_per_night = COALESCE($5, price_per_night),
+            location       = COALESCE($6, location),
+            latitude       = COALESCE($7, latitude),
+            longitude      = COALESCE($8, longitude),
+            status         = COALESCE($9, status),
             updated_at     = NOW()
-        WHERE id = $8
-          AND tenant_id = $9
+        WHERE id = $10
+          AND tenant_id = $11
           AND status != 'deleted'
-        RETURNING id, tenant_id, title, description, price_per_night, location,
+        RETURNING id, tenant_id, title, description,name,type, price_per_night, location,
                   latitude, longitude, status, created_at, updated_at
     `
     var un unit.Unit
     err := u.DbConnection.Pool.QueryRow(ctx, query,
         req.Title,
         req.Description,
+		req.Name,
+		req.UnitType,
         req.PricePerNight,
         req.Location,
         req.Latitude,
@@ -166,6 +182,8 @@ func (u *UnitRepository) Update(ctx context.Context, id, tenantID uuid.UUID, req
         &un.TenantID,
         &un.Title,
         &un.Description,
+		&un.Name,
+		&un.UnitType,
         &un.PricePerNight,
         &un.Location,
         &un.Latitude,

@@ -20,6 +20,8 @@ func (s *UnitService) CreateUnit(ctx context.Context, tenantID uuid.UUID, req Cr
         Title:         req.Title,
         Description:   req.Description,
         PricePerNight: req.PricePerNight,
+        Name: req.Name,
+        UnitType: req.UnitType,
         Location:      req.Location,
         Latitude:      req.Latitude,
         Longitude:     req.Longitude,

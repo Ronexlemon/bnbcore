@@ -14,6 +14,8 @@ type Unit struct {
     Title         string
     Description   string
     PricePerNight float64
+    Name          string
+    UnitType         string
     Location      string
     Latitude      float64
     Longitude     float64
@@ -32,6 +34,8 @@ type UnitImage struct {
 type CreateUnitRequest struct {
     Title         string   `json:"title"`
     Description   string   `json:"description"`
+    Name          string   `json:"name"`
+    UnitType          string   `json:"type"`
     PricePerNight float64  `json:"price_per_night"`
     Location      string   `json:"location"`
     Latitude      float64  `json:"latitude"`
@@ -42,6 +46,8 @@ type CreateUnitRequest struct {
 type UpdateUnitRequest struct {
     Title         *string    `json:"title"`
     Description   *string    `json:"description"`
+    Name          *string    `json:"name"`
+    UnitType         *string    `json:"type"`
     PricePerNight *float64   `json:"price_per_night"`
     Location      *string    `json:"location"`
     Latitude      *float64   `json:"latitude"`
