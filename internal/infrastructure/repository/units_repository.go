@@ -1,13 +1,15 @@
 package repository
 
 import (
-    "context"
-    "errors"
-    "fmt"
-    "github.com/google/uuid"
-    "github.com/jackc/pgx/v5"
-    "github.com/ronexlemon/bnbcore/internal/domain/unit"
-    "github.com/ronexlemon/bnbcore/internal/infrastructure/db"
+	"context"
+	"database/sql"
+	"errors"
+	"fmt"
+
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
+	"github.com/ronexlemon/bnbcore/internal/domain/unit"
+	"github.com/ronexlemon/bnbcore/internal/infrastructure/db"
 )
 
 type UnitRepository struct {
@@ -144,6 +146,35 @@ func (u *UnitRepository) GetAll(ctx context.Context, tenantID uuid.UUID) ([]*uni
     return units, nil
 }
 
+func (u *UnitRepository) GetUnitByIdAndTenant(ctx context.Context, unitID uuid.UUID, tenantID uuid.UUID) (*unit.Unit, error) {
+	query := `
+		SELECT id, tenant_id, title, description,price_per_night, created_at, updated_at
+		FROM units
+		WHERE id = $1 AND tenant_id = $2
+	`
+
+	un := &unit.Unit{}
+
+	err := u.DbConnection.Pool.QueryRow(ctx, query, unitID, tenantID).Scan(
+		&un.ID,
+		&un.TenantID,
+		&un.Title,
+		&un.Description,
+		&un.PricePerNight,
+		&un.CreatedAt,
+		&un.UpdatedAt,
+	)
+
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, fmt.Errorf("unit not found or access denied")
+		}
+		return nil, fmt.Errorf("failed to fetch unit by id and tenant: %w", err)
+	}
+
+	return un, nil
+}
+
 
 func (u *UnitRepository) Update(ctx context.Context, id, tenantID uuid.UUID, req unit.UpdateUnitRequest) (*unit.Unit, error) {
     query := `
@@ -221,15 +252,16 @@ func (u *UnitRepository) Delete(ctx context.Context, id, tenantID uuid.UUID) err
 
 func (u *UnitRepository) AddImage(ctx context.Context, image *unit.UnitImage) (*unit.UnitImage, error) {
     query := `
-        INSERT INTO unit_images (id, unit_id, url)
-        VALUES ($1, $2, $3)
-        RETURNING id, unit_id, url
+        INSERT INTO unit_images (id, unit_id, url,image_type)
+        VALUES ($1, $2, $3, $4)
+        RETURNING id, unit_id, url,image_type
     `
     err := u.DbConnection.Pool.QueryRow(ctx, query,
         image.ID,
         image.UnitID,
         image.URL,
-    ).Scan(&image.ID, &image.UnitID, &image.URL)
+		image.ImageType,
+    ).Scan(&image.ID, &image.UnitID, &image.URL, &image.ImageType)
     if err != nil {
         return nil, fmt.Errorf("failed to add image: %w", err)
     }
@@ -256,7 +288,7 @@ func (u *UnitRepository) RemoveImage(ctx context.Context, imageID, tenantID uuid
 
 func (u *UnitRepository) getImages(ctx context.Context, unitID uuid.UUID) ([]unit.UnitImage, error) {
     rows, err := u.DbConnection.Pool.Query(ctx,
-        `SELECT id, unit_id, url FROM unit_images WHERE unit_id = $1`,
+        `SELECT id, unit_id, url,image_type FROM unit_images WHERE unit_id = $1`,
         unitID,
     )
     if err != nil {
@@ -275,4 +307,29 @@ func (u *UnitRepository) getImages(ctx context.Context, unitID uuid.UUID) ([]uni
     return images, nil
 }
 
+func (u *UnitRepository) GetImagesByUnitID(ctx context.Context, unitID uuid.UUID) ([]*unit.UnitImage, error) {
+    query := `
+        SELECT id, unit_id, url, image_type 
+        FROM unit_images 
+        WHERE unit_id = $1
+        ORDER BY created_at DESC
+    `
+    rows, err := u.DbConnection.Pool.Query(ctx, query, unitID)
+    if err != nil {
+        return nil, fmt.Errorf("failed to fetch unit images: %w", err)
+    }
+    defer rows.Close()
+
+    images := []*unit.UnitImage{}
+    for rows.Next() {
+        img := &unit.UnitImage{}
+        err := rows.Scan(&img.ID, &img.UnitID, &img.URL, &img.ImageType)
+        if err != nil {
+            return nil, err
+        }
+        images = append(images, img)
+    }
+
+    return images, nil
+}
 var _ unit.UnitRepository = (*UnitRepository)(nil)

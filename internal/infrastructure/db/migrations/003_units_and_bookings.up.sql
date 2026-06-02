@@ -45,7 +45,9 @@ CREATE TABLE units (
 CREATE TABLE unit_images (
     id UUID PRIMARY KEY,
     unit_id UUID REFERENCES units(id) ON DELETE CASCADE,
-    url TEXT NOT NULL
+    url TEXT NOT NULL,
+    image_type TEXT NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
 -- =========================

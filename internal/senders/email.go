@@ -24,65 +24,66 @@ func NewSender(config Config) *Sender {
 	return &Sender{config: config}
 }
 
+
 type EmailPayload struct {
-	To      string
-	Subject string
-	Body    string
+	To       string
+	Subject  string
+	Title    string
+	Greeting string
+	Body     string 
+	Footer   string
 }
-
 func (s *Sender) Send(payload EmailPayload) error {
-	msg := fmt.Sprintf(
-		"From: %s\r\nTo: %s\r\nSubject: %s\r\nMIME-Version: 1.0\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n%s",
-		s.config.From,
-		payload.To,
-		payload.Subject,
-		payload.Body,
-	)
+    htmlBody := BuildHTML(payload.Title, payload.Greeting, payload.Body, payload.Footer)
 
-	addr := fmt.Sprintf("%s:%s", s.config.Host, s.config.Port)
-	auth := smtp.PlainAuth("", s.config.Username, s.config.Password, s.config.Host)
+    msg := fmt.Sprintf(
+        "From: %s\r\nTo: %s\r\nSubject: %s\r\nMIME-Version: 1.0\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n%s",
+        s.config.From,
+        payload.To,
+        payload.Subject,
+        htmlBody,
+    )
 
-	client, err := smtp.Dial(addr)
-	if err != nil {
-		return fmt.Errorf("failed to dial SMTP server: %w", err)
-	}
-	defer client.Close()
+    addr := fmt.Sprintf("%s:%s", s.config.Host, s.config.Port)
 
-	
-	// TODO: Set InsecureSkipVerify to false in production and ensure valid certificates are installed
-	tlsConfig := &tls.Config{
-		InsecureSkipVerify: true, 
-		ServerName:         s.config.Host,
-	}
+    client, err := smtp.Dial(addr)
+    if err != nil {
+        return fmt.Errorf("failed to dial SMTP server: %w", err)
+    }
+    defer client.Close()
 
-	if err = client.StartTLS(tlsConfig); err != nil {
-		return fmt.Errorf("failed to establish TLS: %w", err)
-	}
+    tlsConfig := &tls.Config{
+        InsecureSkipVerify: true,
+        ServerName:         s.config.Host,
+    }
 
-	
-	if err = client.Auth(auth); err != nil {
-		return fmt.Errorf("smtp authentication failed: %w", err)
-	}
+    if err = client.StartTLS(tlsConfig); err != nil {
+        return fmt.Errorf("failed to establish TLS: %w", err)
+    }
+    auth := smtp.PlainAuth("", s.config.Username, s.config.Password, s.config.Host)
 
-	
-	if err = client.Mail(s.config.From); err != nil {
-		return fmt.Errorf("failed to set MAIL FROM: %w", err)
-	}
-	if err = client.Rcpt(payload.To); err != nil {
-		return fmt.Errorf("failed to set RCPT TO: %w", err)
-	}
+    if err = client.Auth(auth); err != nil {
+        return fmt.Errorf("smtp authentication failed: %w", err)
+    }
 
-	w, err := client.Data()
-	if err != nil {
-		return fmt.Errorf("failed to open data writer: %w", err)
-	}
-	
-	_, err = w.Write([]byte(msg))
-	if err != nil {
-		return fmt.Errorf("failed to write message body: %w", err)
-	}
+    if err = client.Mail(s.config.From); err != nil {
+        return fmt.Errorf("failed to set MAIL FROM: %w", err)
+    }
+    if err = client.Rcpt(payload.To); err != nil {
+        return fmt.Errorf("failed to set RCPT TO: %w", err)
+    }
 
-	return w.Close()
+    w, err := client.Data()
+    if err != nil {
+        return fmt.Errorf("failed to open data writer: %w", err)
+    }
+
+    _, err = w.Write([]byte(msg))
+    if err != nil {
+        return fmt.Errorf("failed to write message body: %w", err)
+    }
+
+    return w.Close()
 }
 
 func BuildHTML(title, greeting, body, footer string) string {

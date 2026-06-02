@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 	"github.com/ronexlemon/bnbcore/internal/domain/tenant"
 	"github.com/ronexlemon/bnbcore/internal/domain/unit"
 	"github.com/ronexlemon/bnbcore/internal/eventstream"
+	"github.com/ronexlemon/bnbcore/internal/infrastructure/upload"
 	"github.com/ronexlemon/bnbcore/internal/middleware"
 )
 
@@ -20,15 +22,17 @@ type UnitHandler struct {
 	JWTAuthManager *auth.JwtManager
 	SubRepo        subscription.Repository
 	Stream         *eventstream.KafkaClient
+	Media         *upload.MediaService
 }
 
-func NewUnitHandler(server *http.ServeMux, service *unit.UnitService, m *auth.JwtManager,sub subscription.Repository,stream  *eventstream.KafkaClient) *UnitHandler {
+func NewUnitHandler(server *http.ServeMux, service *unit.UnitService, m *auth.JwtManager,sub subscription.Repository,stream  *eventstream.KafkaClient,media *upload.MediaService,) *UnitHandler {
 	h := &UnitHandler{
 		Server:         server,
 		Service:        service,
 		JWTAuthManager: m,
 		SubRepo: sub,
 		Stream: stream,
+		Media: media,
 	}
 	h.registerRoutes()
 	return h
@@ -45,6 +49,7 @@ func (h *UnitHandler) registerRoutes() {
 	
 	h.Server.HandleFunc("GET "+api+"/units", h.GetAllUnits)
 	h.Server.HandleFunc("GET "+api+"/units/{id}", h.GetUnit)
+	h.Server.HandleFunc("GET "+api+"/units/{id}/images", h.GetUnitImages)
 
 	h.Server.Handle("POST "+api+"/units",protected(h.CreateUnit))
 
@@ -129,7 +134,30 @@ tenantID := *t.ID
 		"data": units,
 	})
 }
+func (h *UnitHandler) GetUnitImages(w http.ResponseWriter, r *http.Request) {
+    unitID, err := uuid.Parse(r.PathValue("id"))
+    if err != nil {
+        http.Error(w, "invalid unit id", http.StatusBadRequest)
+        return
+    }
 
+    t := tenant.FromContext(r.Context())
+    if t == nil || t.ID == nil {
+        http.Error(w, "complete workspace setup first", http.StatusPreconditionRequired)
+        return
+    }
+    tenantID := *t.ID
+
+    images, err := h.Service.GetUnitImages(r.Context(), unitID, tenantID)
+    if err != nil {
+        http.Error(w, err.Error(), http.StatusInternalServerError)
+        return
+    }
+
+    writeJSON(w, map[string]any{
+        "data": images,
+    })
+}
 func (h *UnitHandler) GetUnit(w http.ResponseWriter, r *http.Request) {
 	t := tenant.FromContext(r.Context())
 	if t == nil {
@@ -211,11 +239,13 @@ func (h *UnitHandler) DeleteUnit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if claims.TenantID == nil {
+	tenant:=tenant.FromContext(r.Context())
+
+	if tenant.ID == nil {
         http.Error(w,"complete workspace setup first" ,http.StatusPreconditionRequired)
         return
     }
-tenantID := *claims.TenantID
+tenantID := *tenant.ID
 
 	if err := h.Service.DeleteUnit(r.Context(), id, tenantID); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -237,19 +267,37 @@ func (h *UnitHandler) AddImage(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid unit id", http.StatusBadRequest)
 		return
 	}
-
-	var req struct {
-		URL string `json:"url"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.URL == "" {
-		http.Error(w, "url is required", http.StatusBadRequest)
+	imageType := r.FormValue("image_type")
+	if imageType == "" {
+		http.Error(w, "missing 'image_type' field", http.StatusBadRequest)
 		return
 	}
+
+	r.Body = http.MaxBytesReader(w, r.Body, 5<<20)
+	if err := r.ParseMultipartForm(5 << 20); err != nil {
+		http.Error(w, "file size too large or malformed form data", http.StatusBadRequest)
+		return
+	}
+	file, header, err := r.FormFile("image")
+	if err != nil {
+		http.Error(w, "missing 'image' file field", http.StatusBadRequest)
+		return
+	}
+	defer file.Close()
+	cacheKey := fmt.Sprintf("unit:%s:image:%s", unitID.String(), header.Filename)
+	secureURL, err := h.Media.UploadAndCacheStream(r.Context(), file, cacheKey, "hostsasa")
+	if err != nil {
+		http.Error(w, fmt.Sprintf("failed to upload image stream: %v", err), http.StatusInternalServerError)
+		return
+	}
+	fmt.Println("THE URL",secureURL)
+	
 
 	image := &unit.UnitImage{
 		ID:     uuid.New(),
 		UnitID: unitID,
-		URL:    req.URL,
+		URL:    secureURL,
+		ImageType: imageType,
 	}
 
 	result, err := h.Service.Repo.AddImage(r.Context(), image)
@@ -278,11 +326,13 @@ func (h *UnitHandler) RemoveImage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if claims.TenantID == nil {
+	tenant:=tenant.FromContext(r.Context())
+
+	if tenant.ID == nil {
         http.Error(w,"complete workspace setup first" ,http.StatusPreconditionRequired)
         return
     }
-   tenantID := *claims.TenantID
+tenantID := *tenant.ID
 
 	if err := h.Service.Repo.RemoveImage(r.Context(), imageID, tenantID); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)

@@ -1,4 +1,5 @@
 FROM golang:1.25-alpine AS builder
+RUN apk add --no-cache ca-certificates
 
 WORKDIR /app
 
@@ -11,6 +12,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o server ./cmd/api
 
 
 FROM scratch
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 
 COPY --from=builder /app/server /server
 

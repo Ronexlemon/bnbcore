@@ -1,9 +1,11 @@
-
-
 package unit
 
-import "context"
-import "github.com/google/uuid"
+import (
+	"context"
+	"fmt"
+
+	"github.com/google/uuid"
+)
 
 type UnitService struct {
     Repo UnitRepository
@@ -44,4 +46,13 @@ func (s *UnitService) UpdateUnit(ctx context.Context, id, tenantID uuid.UUID, re
 
 func (s *UnitService) DeleteUnit(ctx context.Context, id, tenantID uuid.UUID) error {
     return s.Repo.Delete(ctx, id, tenantID)
+}
+
+func (s *UnitService) GetUnitImages(ctx context.Context, unitID uuid.UUID, tenantID uuid.UUID) ([]*UnitImage, error) {
+    _, err := s.Repo.GetUnitByIdAndTenant(ctx, unitID, tenantID)
+    if err != nil {
+        return nil, fmt.Errorf("unit unauthorized or not found")
+    }
+
+    return s.Repo.GetImagesByUnitID(ctx, unitID)
 }

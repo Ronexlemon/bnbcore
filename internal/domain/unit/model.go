@@ -29,6 +29,7 @@ type UnitImage struct {
     ID     uuid.UUID
     UnitID uuid.UUID
     URL    string
+    ImageType string
 }
 
 type CreateUnitRequest struct {

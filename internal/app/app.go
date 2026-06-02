@@ -21,6 +21,7 @@ import (
 	"github.com/ronexlemon/bnbcore/internal/handler"
 	"github.com/ronexlemon/bnbcore/internal/infrastructure/db"
 	"github.com/ronexlemon/bnbcore/internal/infrastructure/repository"
+	"github.com/ronexlemon/bnbcore/internal/infrastructure/upload"
 	"github.com/ronexlemon/bnbcore/internal/senders"
 	"github.com/ronexlemon/bnbcore/internal/worker"
 )
@@ -33,6 +34,12 @@ func NewMuxService(ctx context.Context) http.Handler {
 	stream, err := eventstream.NewKafkaClient(rpConfig.Brokers)
     if err != nil {
         log.Fatalf("failed to init event stream: %v", err)
+    }
+	redis_client :=config.NewRedisClient(config_env.REDIS_URL)
+
+	media,err := upload.NewMediaService(config_env.CLOUDINARY_URL,redis_client.Client)
+	if err != nil {
+        log.Fatalf("failed to init media : %v", err)
     }
 
     var peppers map[string]string
@@ -105,7 +112,7 @@ func NewMuxService(ctx context.Context) http.Handler {
 
      _ = handler.NewTenantHandler(mux, tenant_service, jwtManager,subscription_repo,stream)
      _ = handler.NewUserHandler(mux, user_service, jwtManager,config_env.BASE_DOMAIN,stream)
-	 _ = handler.NewUnitHandler(mux, unit_service, jwtManager,subscription_repo,stream)
+	 _ = handler.NewUnitHandler(mux, unit_service, jwtManager,subscription_repo,stream,media)
 	 _ = handler.NewBookingHandler(mux, booking_service, jwtManager,stream,subscription_repo)
 	 _ = handler.NewRoomServiceHandler(mux,unit_service_service, jwtManager,subscription_repo,stream)
 	 _ = handler.NewSubscriptionHandler(mux,sunscription_service, jwtManager,stream)
