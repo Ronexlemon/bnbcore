@@ -3,7 +3,6 @@ package handler
 import (
 	"encoding/json"
 	"net/http"
-
 	"github.com/google/uuid"
 	"github.com/ronexlemon/bnbcore/internal/auth"
 	rs "github.com/ronexlemon/bnbcore/internal/domain/services"
@@ -89,6 +88,7 @@ func (h *RoomServiceHandler) Create(w http.ResponseWriter, r *http.Request) {
         http.Error(w, err.Error(), http.StatusBadRequest)
         return
     }
+  
 
     w.WriteHeader(http.StatusCreated)
     writeJSON(w, map[string]any{

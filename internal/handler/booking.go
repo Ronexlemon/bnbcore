@@ -84,7 +84,7 @@ tenantID := *t.ID
 		return
 	}
 
-	err = h.Stream.Publish(r.Context(), eventstream.TopicBookingCreated, result.ID.String(),
+	_ = h.Stream.Publish(r.Context(), eventstream.TopicBookingCreated, result.ID.String(),
         eventstream.BookingCreatedEvent{
             BookingID:  result.ID,
             TenantID:   result.TenantID,

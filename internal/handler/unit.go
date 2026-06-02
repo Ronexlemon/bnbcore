@@ -100,6 +100,10 @@ tenantID := *tenant.ID
             OccuredAt: time.Now(),
         },
         Title: result.Title,
+		ShopName: result.Name,
+		Location: result.Location,
+
+
     },
 )
 
@@ -219,6 +223,28 @@ tenantID := *tenant.ID
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	changes := map[string]any{}
+	if req.Description != nil {
+		changes["shop_description"] = *req.Description
+	}
+	if req.Name != nil {
+		changes["subdomain"] = *req.Name
+	}
+	if req.Status != nil {
+		changes["status"] = *req.Status
+	}
+	_ = h.Stream.Publish(r.Context(), eventstream.TopicUnitUpdated, result.ID.String(),
+    eventstream.UnitUpdatedEvent{
+        BaseEvent: eventstream.BaseEvent{
+            TenantID:  *tenant.ID,
+            UserID:    *claims.UserID,
+            UserEmail: claims.Email,
+            OccuredAt: time.Now(),
+        },
+        Title: result.Title,
+		Changes: changes,
+    },
+)
 
 	writeJSON(w, map[string]any{
 		"message": "unit updated successfully",

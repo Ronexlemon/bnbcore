@@ -218,6 +218,7 @@ func (h *TenantHandler) UpdateTenant(w http.ResponseWriter, r *http.Request) {
 				OccuredAt: time.Now(),
 			},
 			Changes: changes,
+			
 		},
 	)
 
@@ -244,6 +245,15 @@ func (h *TenantHandler) DeleteTenant(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	_ = h.Stream.Publish(r.Context(), eventstream.TopicTenantDeleted, id.String(),
+    eventstream.TenantDeletedEvent{
+        BaseEvent: eventstream.BaseEvent{
+            UserID:    *claims.UserID,
+            UserEmail: claims.Email,
+            OccuredAt: time.Now(),
+        },
+    },
+)
 
 	w.WriteHeader(http.StatusNoContent)
 }
