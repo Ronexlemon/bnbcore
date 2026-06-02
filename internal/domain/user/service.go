@@ -50,7 +50,7 @@ func (u *UserService) Register(ctx context.Context, email, password string) (*Us
 }
 
 
-func (u *UserService) RegisterWithGoogle(ctx context.Context, req GoogleLoginRequest, shopName, subdomain string) (*User, error) {
+func (u *UserService) RegisterWithGoogle(ctx context.Context, req GoogleLoginRequest) (*User, error) {
 
     payload, err := idtoken.Validate(ctx, req.Credential, u.GoogleClientID)
     if err != nil {

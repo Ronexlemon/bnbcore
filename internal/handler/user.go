@@ -12,8 +12,6 @@ import (
 
 type GoogleAuthRequest struct {
     Credential string `json:"credential"`
-    ShopName   string `json:"shop_name"` 
-    Subdomain  string `json:"subdomain"` 
 }
 
 type UserHandler struct {
@@ -100,7 +98,7 @@ func (h *UserHandler) GoogleAuth(w http.ResponseWriter, r *http.Request) {
 
     userResult, err := h.Service.RegisterWithGoogle(r.Context(), user.GoogleLoginRequest{
         Credential: req.Credential,
-    }, req.ShopName, req.Subdomain)
+    })
     if err != nil {
         http.Error(w, err.Error(), http.StatusBadRequest)
         return

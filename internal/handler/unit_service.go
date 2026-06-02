@@ -8,6 +8,7 @@ import (
 	"github.com/ronexlemon/bnbcore/internal/auth"
 	rs "github.com/ronexlemon/bnbcore/internal/domain/services"
 	"github.com/ronexlemon/bnbcore/internal/domain/subscription"
+	"github.com/ronexlemon/bnbcore/internal/domain/tenant"
 	"github.com/ronexlemon/bnbcore/internal/eventstream"
 	"github.com/ronexlemon/bnbcore/internal/middleware"
 )
@@ -68,11 +69,14 @@ func (h *RoomServiceHandler) Create(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-  if claims.TenantID == nil {
-        http.Error(w,"complete workspace setup first" ,http.StatusPreconditionRequired)
+  tenant := tenant.FromContext(r.Context())
+	if tenant.ID ==nil{
+		 http.Error(w,"complete workspace setup first" ,http.StatusPreconditionRequired)
         return
-    }
-tenantID := *claims.TenantID
+
+	}
+
+	tenantID :=*tenant.ID
 
     var req rs.CreateUnitServiceRequest
     if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -106,11 +110,14 @@ func (h *RoomServiceHandler) GetByUnit(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-if claims.TenantID == nil {
-        http.Error(w,"complete workspace setup first" ,http.StatusPreconditionRequired)
+tenant := tenant.FromContext(r.Context())
+	if tenant.ID ==nil{
+		 http.Error(w,"complete workspace setup first" ,http.StatusPreconditionRequired)
         return
-    }
-tenantID := *claims.TenantID
+
+	}
+
+	tenantID :=*tenant.ID
 
     services, err := h.Service.GetByUnit(r.Context(), unitID, tenantID)
     if err != nil {
@@ -134,11 +141,14 @@ func (h *RoomServiceHandler) GetByID(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    if claims.TenantID == nil {
-        http.Error(w,"complete workspace setup first" ,http.StatusPreconditionRequired)
+    tenant := tenant.FromContext(r.Context())
+	if tenant.ID ==nil{
+		 http.Error(w,"complete workspace setup first" ,http.StatusPreconditionRequired)
         return
-    }
-tenantID := *claims.TenantID
+
+	}
+
+	tenantID :=*tenant.ID
 
     result, err := h.Service.GetByID(r.Context(), id, tenantID)
     if err != nil {
@@ -162,11 +172,14 @@ func (h *RoomServiceHandler) Update(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-   if claims.TenantID == nil {
-        http.Error(w,"complete workspace setup first" ,http.StatusPreconditionRequired)
+   tenant := tenant.FromContext(r.Context())
+	if tenant.ID ==nil{
+		 http.Error(w,"complete workspace setup first" ,http.StatusPreconditionRequired)
         return
-    }
-tenantID := *claims.TenantID
+
+	}
+
+	tenantID :=*tenant.ID
 
     var req rs.UpdateUnitServiceRequest
     if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -199,11 +212,14 @@ func (h *RoomServiceHandler) Delete(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    if claims.TenantID == nil {
-        http.Error(w,"complete workspace setup first" ,http.StatusPreconditionRequired)
+    tenant := tenant.FromContext(r.Context())
+	if tenant.ID ==nil{
+		 http.Error(w,"complete workspace setup first" ,http.StatusPreconditionRequired)
         return
-    }
-tenantID := *claims.TenantID
+
+	}
+
+	tenantID :=*tenant.ID
 
     if err := h.Service.Delete(r.Context(), id, tenantID); err != nil {
         http.Error(w, err.Error(), http.StatusBadRequest)
