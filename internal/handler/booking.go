@@ -114,11 +114,13 @@ func (h *BookingHandler) GetAllBookings(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	if claims.TenantID == nil {
+	tenant:=tenant.FromContext(r.Context())
+
+	if tenant.ID == nil {
         http.Error(w,"complete workspace setup first" ,http.StatusPreconditionRequired)
         return
     }
-    tenantID := *claims.TenantID 
+tenantID := *tenant.ID
 
 	bookings, err := h.Service.GetAllBookings(r.Context(), tenantID)
 	if err != nil {
@@ -162,11 +164,13 @@ func (h *BookingHandler) GetBooking(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if claims.TenantID == nil {
+	tenant:=tenant.FromContext(r.Context())
+
+	if tenant.ID == nil {
         http.Error(w,"complete workspace setup first" ,http.StatusPreconditionRequired)
         return
     }
-   tenantID := *claims.TenantID
+tenantID := *tenant.ID
 
 	result, err := h.Service.GetBooking(r.Context(), id, tenantID)
 	if err != nil {
@@ -192,11 +196,13 @@ func (h *BookingHandler) GetBookingsByUnit(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	if claims.TenantID == nil {
+	tenant:=tenant.FromContext(r.Context())
+
+	if tenant.ID == nil {
         http.Error(w,"complete workspace setup first" ,http.StatusPreconditionRequired)
         return
     }
-  tenantID := *claims.TenantID
+tenantID := *tenant.ID
 
 	bookings, err := h.Service.GetBookingsByUnit(r.Context(), unitID, tenantID)
 	if err != nil {
@@ -278,11 +284,13 @@ func (h *BookingHandler) CancelBooking(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if claims.TenantID == nil {
+	tenant:=tenant.FromContext(r.Context())
+
+	if tenant.ID == nil {
         http.Error(w,"complete workspace setup first" ,http.StatusPreconditionRequired)
         return
     }
-   tenantID := *claims.TenantID
+tenantID := *tenant.ID
 
 	if err := h.Service.CancelBooking(r.Context(), id, tenantID); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)

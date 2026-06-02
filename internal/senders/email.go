@@ -21,6 +21,8 @@ type Sender struct {
 }
 
 func NewSender(config Config) *Sender {
+    fmt.Printf("DEBUG: host=%q port=%q user=%q pass=%q from=%q\n",
+        config.Host, config.Port, config.Username, config.Password, config.From)
 	return &Sender{config: config}
 }
 
@@ -46,6 +48,7 @@ func (s *Sender) Send(payload EmailPayload) error {
 
     addr := fmt.Sprintf("%s:%s", s.config.Host, s.config.Port)
 
+
     client, err := smtp.Dial(addr)
     if err != nil {
         return fmt.Errorf("failed to dial SMTP server: %w", err)
@@ -53,7 +56,7 @@ func (s *Sender) Send(payload EmailPayload) error {
     defer client.Close()
 
     tlsConfig := &tls.Config{
-        InsecureSkipVerify: true,
+        InsecureSkipVerify: false,
         ServerName:         s.config.Host,
     }
 

@@ -71,6 +71,7 @@ func Load() *Config {
 		PORT:strings.TrimSpace(os.Getenv("PORT")),
 		FROM:strings.TrimSpace(os.Getenv("FROM")),
 		PASSWORD:strings.TrimSpace(os.Getenv("PASSWORD")),
+		USERNAME:strings.TrimSpace(os.Getenv("USERNAME")),
 		REDIS_URL:strings.TrimSpace(os.Getenv("REDIS_URL")),
 		CLOUDINARY_URL:strings.TrimSpace(os.Getenv("CLOUDINARY_URL")),
 		

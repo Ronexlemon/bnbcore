@@ -30,7 +30,7 @@ func NewMuxService(ctx context.Context) http.Handler {
 	workerCtx := context.Background()
     config_env := config.Load()
 	rpConfig := config.LoadKafkaConfig()
-	sender :=senders.NewSender(senders.Config{Host: config_env.HOST,Port: config_env.PORT,From: config_env.FROM,Password: config_env.PASSWORD})
+	sender :=senders.NewSender(senders.Config{Host: config_env.HOST,Port: config_env.PORT,From: config_env.FROM,Password: config_env.PASSWORD,Username: config_env.USERNAME})
 	stream, err := eventstream.NewKafkaClient(rpConfig.Brokers)
     if err != nil {
         log.Fatalf("failed to init event stream: %v", err)
