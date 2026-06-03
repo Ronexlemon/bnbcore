@@ -9,9 +9,10 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/google/uuid"
 	"github.com/ronexlemon/bnbcore/internal/domain/user"
 	"github.com/ronexlemon/bnbcore/internal/infrastructure/db"
-	"github.com/google/uuid"
+	"github.com/ronexlemon/bnbcore/pkg/helpers"
 	"google.golang.org/api/idtoken"
 )
 
@@ -36,7 +37,7 @@ func (u *UserRepository) Register(ctx context.Context, email, hashedPassword str
 
 	err := u.DBConnection.Pool.QueryRow(ctx, `
 		INSERT INTO users (id, email, password_hash, role, is_active, created_at)
-		VALUES (gen_random_uuid(), $1, $2, 'owner', true, NOW())
+		VALUES (gen_random_uuid(), $1, $2, 'owner', false, NOW())
 		RETURNING id, email, role, is_active, created_at
 	`, email, hashedPassword).Scan(
 		&usr.ID,
@@ -77,6 +78,19 @@ func (u *UserRepository) Login(ctx context.Context, email string,password string
 	return &usr, nil
 }
 
+func (u *UserRepository) ActivateUser(ctx context.Context, userID uuid.UUID) error {
+    result, err := u.DBConnection.Pool.Exec(ctx,
+        `UPDATE users SET is_active = true, updated_at = NOW() WHERE id = $1`,
+        userID,
+    )
+    if err != nil {
+        return fmt.Errorf("failed to activate user: %w", err)
+    }
+    if result.RowsAffected() == 0 {
+        return fmt.Errorf("user not found: %s", userID)
+    }
+    return nil
+}
 
 func (u *UserRepository)StoreRefreshToken(ctx context.Context,userID uuid.UUID,refreshTokenHash string,createdAt time.Time,isRevoked bool,expiresAt time.Time)error{
 	_, err := u.DBConnection.Pool.Exec(ctx, `
@@ -259,4 +273,55 @@ func (u *UserRepository) LoginWithGoogle(ctx context.Context, googleClientID str
 	}
 
 	return &usr, nil
+}
+
+func (u *UserRepository) StoreMagicLinkToken(ctx context.Context, userID uuid.UUID, tokenHash string, expiresAt time.Time) error {
+    _, err := u.DBConnection.Pool.Exec(ctx, `
+        INSERT INTO magic_link_tokens (id, user_id, token_hash, expires_at, used, created_at)
+        VALUES (gen_random_uuid(), $1, $2, $3, false, NOW())
+    `, userID, tokenHash, expiresAt)
+    if err != nil {
+        return fmt.Errorf("failed to store magic link token structure: %w", err)
+    }
+    return nil
+}
+
+
+func (u *UserRepository) FindMagicLinkToken(ctx context.Context, rawToken string) (*user.MagicLinkToken, error) {
+    hash := helpers.HashToken(rawToken)
+
+    var t user.MagicLinkToken
+    err := u.DBConnection.Pool.QueryRow(ctx, `
+        SELECT id, user_id, token_hash, expires_at, used, created_at
+        FROM magic_link_tokens
+        WHERE token_hash = $1
+          AND used       = false
+          AND expires_at > NOW()
+    `, hash).Scan(
+        &t.ID,
+        &t.UserID,
+        &t.TokenHash,
+        &t.ExpiresAt,
+        &t.Used,
+        &t.CreatedAt,
+    )
+    if err != nil {
+        if errors.Is(err, pgx.ErrNoRows) {
+            return nil, errors.New("invalid or expired link")
+        }
+        return nil, fmt.Errorf("failed to find magic link token: %w", err)
+    }
+    return &t, nil
+}
+
+func (u *UserRepository) DeleteMagicLinkToken(ctx context.Context, rawToken string) error {
+    hash := helpers.HashToken(rawToken)
+
+    _, err := u.DBConnection.Pool.Exec(ctx, `
+        UPDATE magic_link_tokens SET used = true WHERE token_hash = $1
+    `, hash)
+    if err != nil {
+        return fmt.Errorf("failed to invalidate magic link token: %w", err)
+    }
+    return nil
 }

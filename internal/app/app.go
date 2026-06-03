@@ -111,7 +111,7 @@ func NewMuxService(ctx context.Context) http.Handler {
     user_service := user.NewUserservice(user_repo, passwordEngine, tokenEngine, config_env.GOOGLE_CLIENT_ID)
 
      _ = handler.NewTenantHandler(mux, tenant_service, jwtManager,subscription_repo,stream)
-     _ = handler.NewUserHandler(mux, user_service, jwtManager,config_env.BASE_DOMAIN,stream)
+     _ = handler.NewUserHandler(mux, user_service, jwtManager,config_env.BASE_DOMAIN,stream,sender)
 	 _ = handler.NewUnitHandler(mux, unit_service, jwtManager,subscription_repo,stream,media)
 	 _ = handler.NewBookingHandler(mux, booking_service, jwtManager,stream,subscription_repo)
 	 _ = handler.NewRoomServiceHandler(mux,unit_service_service, jwtManager,subscription_repo,stream)

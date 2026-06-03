@@ -8,6 +8,7 @@ import (
 	"github.com/ronexlemon/bnbcore/internal/auth"
 	"github.com/ronexlemon/bnbcore/internal/domain/user"
 	"github.com/ronexlemon/bnbcore/internal/eventstream"
+	"github.com/ronexlemon/bnbcore/internal/senders"
 )
 
 type GoogleAuthRequest struct {
@@ -20,19 +21,21 @@ type UserHandler struct {
     JWTAuthManager *auth.JwtManager
     BaseUrl        string
 	Stream         *eventstream.KafkaClient
+    EmailSender  *senders.Sender
 }
 type RegisterRequest struct {
     Email     string `json:"email"`
     Password  string `json:"password"`
 }
 
-func NewUserHandler(server *http.ServeMux, service *user.UserService, manager *auth.JwtManager, base string,stream  *eventstream.KafkaClient) *UserHandler {
+func NewUserHandler(server *http.ServeMux, service *user.UserService, manager *auth.JwtManager, base string,stream  *eventstream.KafkaClient,email *senders.Sender) *UserHandler {
     h := &UserHandler{
         Server:         server,
         Service:        service,
         JWTAuthManager: manager,
         BaseUrl:        base,
 		Stream: stream,
+        EmailSender: email,
     }
     h.registerRoutes()
     return h
@@ -41,6 +44,8 @@ func NewUserHandler(server *http.ServeMux, service *user.UserService, manager *a
 func (h *UserHandler) registerRoutes() {
     api := "/api/v1"
     h.Server.HandleFunc("POST "+api+"/users/register", h.CreateUser)
+    h.Server.HandleFunc("GET  "+api+"/auth/verify",      h.VerifyMagicLink)        
+h.Server.HandleFunc("POST "+api+"/auth/resend",      h.ResendVerification)  
     h.Server.HandleFunc("POST "+api+"/users/login", h.LoginHandler)
     h.Server.HandleFunc("POST "+api+"/auth/google", h.GoogleAuth) 
     h.Server.HandleFunc("POST "+api+"/auth/refresh", h.RefreshHandler)
@@ -58,17 +63,90 @@ func (h *UserHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-
-
     usr, err := h.Service.Register(r.Context(), req.Email, req.Password)
     if err != nil {
         http.Error(w, err.Error(), http.StatusBadRequest)
         return
     }
 
-	h.issueTokens(w, r, usr)
+    token, err := h.Service.CreateMagicLinkToken(r.Context(), usr.ID)
+    if err != nil {
+        http.Error(w, "could not create verification link", http.StatusInternalServerError)
+        return
+    }
+
+    link := fmt.Sprintf("%s/auth/verify?token=%s", h.BaseUrl, token)
+
+    if err := h.EmailSender.Send(senders.EmailPayload{To: usr.Email,Body: link}); err != nil {
+        http.Error(w, "could not send verification email", http.StatusInternalServerError)
+        return
+    }
+w.WriteHeader(http.StatusAccepted)
+    json.NewEncoder(w).Encode(map[string]string{
+        "message": "check your email to complete sign-up",
+    })
+	//h.issueTokens(w, r, usr)
 }
 
+func (h *UserHandler) VerifyMagicLink(w http.ResponseWriter, r *http.Request) {
+    token := r.URL.Query().Get("token")
+    if token == "" {
+        http.Error(w, "missing token", http.StatusBadRequest)
+        return
+    }
+
+    usr, err := h.Service.ValidateMagicLinkToken(r.Context(), token)
+    if err != nil {
+        http.Error(w, "invalid or expired link", http.StatusUnauthorized)
+        return
+    }
+
+    h.issueTokens(w, r, usr)
+}
+
+func (h *UserHandler) ResendVerification(w http.ResponseWriter, r *http.Request) {
+    var req struct {
+        Email string `json:"email"`
+    }
+    if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+        http.Error(w, "invalid body format", http.StatusBadRequest)
+        return
+    }
+
+    usr, err := h.Service.GetUserByEmail(r.Context(), req.Email)
+    if err != nil {
+        w.WriteHeader(http.StatusAccepted)
+        json.NewEncoder(w).Encode(map[string]string{
+            "message": "if that email is registered, a new link is on its way",
+        })
+        return
+    }
+
+    if usr.IsActive {
+        w.WriteHeader(http.StatusAccepted)
+        json.NewEncoder(w).Encode(map[string]string{
+            "message": "if that email is registered, a new link is on its way",
+        })
+        return
+    }
+
+    token, err := h.Service.CreateMagicLinkToken(r.Context(), usr.ID)
+    if err != nil {
+        http.Error(w, "could not create verification link", http.StatusInternalServerError)
+        return
+    }
+
+    link := fmt.Sprintf("%s/auth/verify?token=%s", h.BaseUrl, token)
+    if err := h.EmailSender.Send(senders.EmailPayload{To: usr.Email,Body: link}); err != nil {
+        http.Error(w, "could not send verification email", http.StatusInternalServerError)
+        return
+    }
+
+    w.WriteHeader(http.StatusAccepted)
+    json.NewEncoder(w).Encode(map[string]string{
+        "message": "if that email is registered, a new link is on its way",
+    })
+}
 func (h *UserHandler) LoginHandler(w http.ResponseWriter, r *http.Request) {
     var req user.User
     if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -79,6 +157,21 @@ func (h *UserHandler) LoginHandler(w http.ResponseWriter, r *http.Request) {
     userResult, err := h.Service.Login(r.Context(), req.Email, req.Password)
     if err != nil {
         http.Error(w, err.Error(), http.StatusUnauthorized)
+        return
+    }
+    if !userResult.IsActive {
+         token, err := h.Service.CreateMagicLinkToken(r.Context(), userResult.ID)
+    if err != nil {
+        http.Error(w, "could not create verification link", http.StatusInternalServerError)
+        return
+    }
+
+    link := fmt.Sprintf("%s/auth/verify?token=%s", h.BaseUrl, token)
+    if err := h.EmailSender.Send(senders.EmailPayload{To: userResult.Email,Body: link}); err != nil {
+        http.Error(w, "could not send verification email", http.StatusInternalServerError)
+        return
+    }
+        http.Error(w, "email not verified — check your inbox", http.StatusForbidden)
         return
     }
 

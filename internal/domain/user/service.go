@@ -7,9 +7,10 @@ import (
 	"time"
 
 	"cloud.google.com/go/auth/credentials/idtoken"
+	"github.com/google/uuid"
 	"github.com/ronexlemon/bnbcore/internal/auth/password"
 	"github.com/ronexlemon/bnbcore/internal/auth/token"
-	"github.com/google/uuid"
+	"github.com/ronexlemon/bnbcore/pkg/helpers"
 )
 
 type UserService struct{
@@ -70,6 +71,10 @@ func (u *UserService) RegisterWithGoogle(ctx context.Context, req GoogleLoginReq
 
     return u.Repo.GoogleRegister(ctx, email)
 }
+func (u *UserService) GetUserByEmail(ctx context.Context,email string)(*User,error){
+	return u.Repo.GetUserByEmail(ctx,email)
+
+}
 func (u *UserService) Login(ctx context.Context,email,password string)(*User,error){
 	userResult, err := u.Repo.GetUserByEmail(ctx, email)
 	if err != nil {
@@ -120,4 +125,37 @@ func (u *UserService) LoginWithGoogle(ctx context.Context, req GoogleLoginReques
 		return nil, errors.New("google login is not configured")
 	}
 	return u.Repo.LoginWithGoogle(ctx, u.GoogleClientID, req)
+}
+
+func (s *UserService) CreateMagicLinkToken(ctx context.Context, userID uuid.UUID) (string, error) {
+    rawToken, tokenHash, err := helpers.GenerateMagicLink()
+    if err != nil {
+        return "", err
+    }
+
+    expiresAt := time.Now().Add(30 * time.Minute)
+
+    if err := s.Repo.StoreMagicLinkToken(ctx, userID, tokenHash, expiresAt); err != nil {
+        return "", err
+    }
+
+    return rawToken, nil 
+}
+
+func (s *UserService) ValidateMagicLinkToken(ctx context.Context, rawToken string) (*User, error) {
+    record, err := s.Repo.FindMagicLinkToken(ctx, rawToken)
+    if err != nil {
+        return nil, err
+    }
+
+    if err := s.Repo.DeleteMagicLinkToken(ctx, rawToken); err != nil {
+        return nil, err
+    }
+
+    // Activate the account on first verified click
+    if err := s.Repo.ActivateUser(ctx, record.UserID); err != nil {
+        return nil, err
+    }
+
+    return s.Repo.GetUserByID(ctx, record.UserID)
 }

@@ -22,3 +22,6 @@ CREATE INDEX idx_bookings_dates      ON bookings(start_date, end_date);
 -- =========================
 CREATE INDEX idx_subscriptions_tenant ON subscriptions(tenant_id);
 CREATE INDEX idx_subscriptions_status ON subscriptions(status);
+
+CREATE INDEX idx_magic_link_tokens_token_hash ON magic_link_tokens(token_hash);
+CREATE INDEX idx_magic_link_tokens_user_id    ON magic_link_tokens(user_id);

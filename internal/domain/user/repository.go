@@ -21,5 +21,10 @@ type UserRepository interface{
 	EmailExists(ctx context.Context, email string) (bool, error)
 	UpdatePasswordHash(ctx context.Context, userID uuid.UUID, newHash string) error
 	LoginWithGoogle(ctx context.Context, googleClientID string, req GoogleLoginRequest) (*User, error)
+	DeleteMagicLinkToken(ctx context.Context, rawToken string) error
+	FindMagicLinkToken(ctx context.Context, rawToken string) (*MagicLinkToken, error)
+	StoreMagicLinkToken(ctx context.Context, userID uuid.UUID, rawToken string, expiresAt time.Time) error
+	ActivateUser(ctx context.Context, userID uuid.UUID) error
+	
 	// RegisterWithGoogle(ctx context.Context, googleClientID string, req GoogleLoginRequest, shopName, subdomain string) (*User, error)
 }

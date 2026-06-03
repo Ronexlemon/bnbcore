@@ -31,3 +31,11 @@ type REFRESHTOKEN struct{
 		IsRevoked	bool	`json:"is_revoked"` 
 		CreateAt	time.Time	`json:"created_at"` 
 }
+type MagicLinkToken struct {
+    ID        uuid.UUID
+    UserID    uuid.UUID
+    TokenHash string
+    ExpiresAt time.Time
+    Used      bool
+    CreatedAt time.Time
+}
