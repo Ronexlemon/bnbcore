@@ -37,14 +37,14 @@ func NewTenantRepository(dbconnect *db.PostgresConn) (*TenantRepository, error) 
 
 
 
-func (t *TenantRepository) CreateTenant(ctx context.Context, shopName, shopDescription, subdomain string, userID uuid.UUID) (*tenant.Tenant, error) {
+func (t *TenantRepository) CreateTenant(ctx context.Context, shopName, shopDescription, subdomain string, userID uuid.UUID,long_Description string) (*tenant.Tenant, error) {
 	var tn tenant.Tenant
 
 	err := t.DbConnection.Pool.QueryRow(ctx, `
-		INSERT INTO tenants (id, user_id, name, shop_description, subdomain, status, trial_ends_at, created_at)
-		VALUES (gen_random_uuid(), $1, $2, $3, $4, 'trial', NOW() + INTERVAL '14 days', NOW())
-		RETURNING id, user_id, name, shop_description, subdomain, status, trial_ends_at, created_at
-	`, userID, shopName, shopDescription, subdomain).Scan(
+		INSERT INTO tenants (id, user_id, name, shop_description, subdomain,long_description, status, trial_ends_at, created_at)
+		VALUES (gen_random_uuid(), $1, $2, $3, $4, $5,'trial', NOW() + INTERVAL '14 days', NOW())
+		RETURNING id, user_id, name, shop_description, subdomain, status, trial_ends_at,long_description, created_at
+	`, userID, shopName, shopDescription, subdomain,long_Description).Scan(
 		&tn.ID,
 		&tn.UserID,
 		&tn.ShopName,
@@ -52,6 +52,7 @@ func (t *TenantRepository) CreateTenant(ctx context.Context, shopName, shopDescr
 		&tn.Subdomain,
 		&tn.Status,
 		&tn.TrialEndsAt,
+		&tn.LongDescription,
 		&tn.CreatedAt,
 	)
 	if err != nil {
@@ -66,7 +67,7 @@ func (t *TenantRepository) FindByID(ctx context.Context, id uuid.UUID) (*tenant.
 	var tn tenant.Tenant
 
 	err := t.DbConnection.Pool.QueryRow(ctx, `
-		SELECT id, user_id,name,shop_description, subdomain, status, trial_ends_at, created_at
+		SELECT id, user_id,name,shop_description, subdomain, status,long_description,banner, trial_ends_at, created_at
 		FROM tenants
 		WHERE id = $1
 	`, id).Scan(
@@ -76,6 +77,8 @@ func (t *TenantRepository) FindByID(ctx context.Context, id uuid.UUID) (*tenant.
 		&tn.ShopDescription,
 		&tn.Subdomain,
 		&tn.Status,
+		&tn.LongDescription,
+		&tn.Banner,
 		&tn.TrialEndsAt,
 		&tn.CreatedAt,
 	)
@@ -92,7 +95,7 @@ func (t *TenantRepository) FindByUserID(ctx context.Context, userID uuid.UUID) (
 	var tn tenant.Tenant
 
 	err := t.DbConnection.Pool.QueryRow(ctx, `
-		SELECT id, user_id,name, shop_description, subdomain, status, trial_ends_at, created_at
+		SELECT id, user_id,name, shop_description, subdomain, status,long_description,banner, trial_ends_at, created_at
 		FROM tenants
 		WHERE user_id = $1
 	`, userID).Scan(
@@ -102,6 +105,8 @@ func (t *TenantRepository) FindByUserID(ctx context.Context, userID uuid.UUID) (
 		&tn.ShopDescription,
 		&tn.Subdomain,
 		&tn.Status,
+		&tn.LongDescription,
+		&tn.Banner,
 		&tn.TrialEndsAt,
 		&tn.CreatedAt,
 	)
@@ -118,7 +123,7 @@ func (t *TenantRepository) FindBySubdomain(ctx context.Context, sub string) (*te
 	var tn tenant.Tenant
 
 	err := t.DbConnection.Pool.QueryRow(ctx, `
-		SELECT id, user_id,name, shop_description, subdomain, status, trial_ends_at, created_at
+		SELECT id, user_id,name, shop_description, subdomain, status,long_description,banner, trial_ends_at, created_at
 		FROM tenants
 		WHERE subdomain = $1
 	`, sub).Scan(
@@ -128,6 +133,8 @@ func (t *TenantRepository) FindBySubdomain(ctx context.Context, sub string) (*te
 		&tn.ShopDescription,
 		&tn.Subdomain,
 		&tn.Status,
+		&tn.LongDescription,
+		&tn.Banner,
 		&tn.TrialEndsAt,
 		&tn.CreatedAt,
 	)
@@ -142,7 +149,7 @@ func (t *TenantRepository) FindBySubdomain(ctx context.Context, sub string) (*te
 
 func (t *TenantRepository) GetAll(ctx context.Context) ([]*tenant.Tenant, error) {
 	rows, err := t.DbConnection.Pool.Query(ctx, `
-		SELECT id, user_id,name, shop_description, subdomain, status, trial_ends_at, created_at
+		SELECT id, user_id,name, shop_description, subdomain, status,long_description,banner, trial_ends_at, created_at
 		FROM tenants
 		ORDER BY created_at DESC
 	`)
@@ -161,6 +168,8 @@ func (t *TenantRepository) GetAll(ctx context.Context) ([]*tenant.Tenant, error)
 			&tn.ShopDescription,
 			&tn.Subdomain,
 			&tn.Status,
+			&tn.LongDescription,
+			&tn.Banner,
 			&tn.TrialEndsAt,
 			&tn.CreatedAt,
 		); err != nil {
@@ -182,15 +191,19 @@ func (t *TenantRepository) UpdateTenant(ctx context.Context, id uuid.UUID, req t
 			subdomain = COALESCE($2, subdomain),
 			name = COALESCE($3, name),
 			status    = COALESCE($4, status)
-		WHERE id = $4
-		RETURNING id, user_id,name,shop_description, subdomain, status, trial_ends_at, created_at
-	`, req.ShopDescription, req.Subdomain,req.ShopName ,req.Status, id).Scan(
+			banner    = COALESCE($5, banner )
+			long_description    = COALESCE($6, long_description )
+		WHERE id = $7
+		RETURNING id, user_id,name,shop_description, subdomain, status,banner,long_description, trial_ends_at, created_at
+	`, req.ShopDescription, req.Subdomain,req.ShopName ,req.Status,req.Banner,req.LongDescription, id).Scan(
 		&tn.ID,
 		&tn.UserID,
 		&tn.ShopName,
 		&tn.ShopDescription,
 		&tn.Subdomain,
 		&tn.Status,
+		&tn.Banner,
+		&tn.LongDescription,
 		&tn.TrialEndsAt,
 		&tn.CreatedAt,
 	)

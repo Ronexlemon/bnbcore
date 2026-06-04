@@ -25,3 +25,6 @@ CREATE INDEX idx_subscriptions_status ON subscriptions(status);
 
 CREATE INDEX idx_magic_link_tokens_token_hash ON magic_link_tokens(token_hash);
 CREATE INDEX idx_magic_link_tokens_user_id    ON magic_link_tokens(user_id);
+
+
+CREATE INDEX idx_units_amenities_jsonb ON units USING gin(amenities);

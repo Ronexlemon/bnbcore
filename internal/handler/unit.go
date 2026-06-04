@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -127,16 +128,33 @@ func (h *UnitHandler) GetAllUnits(w http.ResponseWriter, r *http.Request) {
         return
     }
 tenantID := *t.ID
-	 
-	units, err := h.Service.GetAllUnits(r.Context(), tenantID)
+
+    query := r.URL.Query()
+    limit := 10
+    if lStr := query.Get("limit"); lStr != "" {
+        if parsedLimit, err := strconv.Atoi(lStr); err == nil && parsedLimit > 0 {
+            limit = parsedLimit
+        }
+    }
+    offset := 0
+    if oStr := query.Get("offset"); oStr != "" {
+        if parsedOffset, err := strconv.Atoi(oStr); err == nil && parsedOffset >= 0 {
+            offset = parsedOffset
+        }
+    }
+	units, err := h.Service.GetAllUnits(r.Context(), tenantID,limit,offset)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	writeJSON(w, map[string]any{
-		"data": units,
-	})
+        "data": units,
+        "meta": map[string]int{
+            "limit":  limit,
+            "offset": offset,
+        },
+    })
 }
 func (h *UnitHandler) GetUnitImages(w http.ResponseWriter, r *http.Request) {
     unitID, err := uuid.Parse(r.PathValue("id"))

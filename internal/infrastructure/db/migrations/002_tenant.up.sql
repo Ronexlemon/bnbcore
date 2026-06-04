@@ -41,6 +41,8 @@ CREATE TABLE tenants (
     name          TEXT NOT NULL,
     subdomain     TEXT UNIQUE NOT NULL,
     shop_description TEXT NOT NULL,
+    banner  TEXT ,
+    long_description TEXT,
     status        tenant_status DEFAULT 'trial',
     trial_ends_at TIMESTAMP NOT NULL DEFAULT now() + INTERVAL '14 days',
     created_at    TIMESTAMP DEFAULT now()

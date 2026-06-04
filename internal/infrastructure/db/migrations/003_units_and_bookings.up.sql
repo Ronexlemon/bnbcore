@@ -3,7 +3,7 @@
 CREATE TYPE unit_status AS ENUM (
     'active',
     'inactive',
-    'deleted'
+    'deleted',
     'maintenance'
 );
 
@@ -27,6 +27,8 @@ CREATE TABLE units (
     name TEXT NOT NULL,
     type text NOT NULL,
     description TEXT,
+    adults INTEGER NOT NULL DEFAULT 0,
+    children INTEGER NOT NULL DEFAULT 0,
 
     price_per_night NUMERIC NOT NULL,
 
@@ -35,6 +37,8 @@ CREATE TABLE units (
     longitude DOUBLE PRECISION,
 
     status unit_status DEFAULT 'active',
+    amenities JSONB NOT NULL DEFAULT '{}',
+    rules JSONB NOT NULL DEFAULT '{}',
 
     created_at TIMESTAMP DEFAULT now(),
     updated_at TIMESTAMP DEFAULT now()
@@ -63,6 +67,7 @@ CREATE TABLE bookings (
     guest_name TEXT,
     guest_email TEXT,
     guest_phone TEXT,
+    guest_number NUMERIC,
 
     start_date DATE NOT NULL,
     end_date DATE NOT NULL,

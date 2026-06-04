@@ -1,6 +1,7 @@
 package unit
 
 import (
+	"encoding/json"
 	"time"
 
 	"github.com/google/uuid"
@@ -9,20 +10,24 @@ import (
 type UnitStatus string
 
 type Unit struct {
-    ID            uuid.UUID
-    TenantID      uuid.UUID
-    Title         string
-    Description   string
-    PricePerNight float64
-    Name          string
-    UnitType         string
-    Location      string
-    Latitude      float64
-    Longitude     float64
-    Status        UnitStatus
-    Images        []UnitImage
-    CreatedAt     time.Time
-    UpdatedAt     time.Time
+    ID            uuid.UUID       `json:"id"`
+    TenantID      uuid.UUID       `json:"tenant_id"`
+    Title         string          `json:"title"`
+    Description   string          `json:"description"`
+    PricePerNight float64         `json:"price_per_night"`
+    Name          string          `json:"name"`
+    UnitType      string          `json:"type"`
+    Location      string          `json:"location"`
+    Latitude      float64         `json:"latitude"`
+    Longitude     float64         `json:"longitude"`
+    Adults        int32           `json:"adults"`
+    Children      int32           `json:"children"`    
+    Status        UnitStatus      `json:"status"`
+    Amenities     json.RawMessage `json:"amenities"`
+    Rules         json.RawMessage `json:"rules"` 
+    Images        []UnitImage     `json:"images"`
+    CreatedAt     time.Time       `json:"created_at"`
+    UpdatedAt     time.Time       `json:"updated_at"`
 }
 
 type UnitImage struct {
@@ -40,6 +45,10 @@ type CreateUnitRequest struct {
     PricePerNight float64  `json:"price_per_night"`
     Location      string   `json:"location"`
     Latitude      float64  `json:"latitude"`
+    Adults        int32    `json:"adults"`
+    Children      int32   `json:"children"`
+    Amenities     []string `json:"amenities"`
+    Rules         []string `json:"rules"`
     Longitude     float64  `json:"longitude"`
     Images        []string `json:"images"` // URLs
 }
@@ -52,6 +61,12 @@ type UpdateUnitRequest struct {
     PricePerNight *float64   `json:"price_per_night"`
     Location      *string    `json:"location"`
     Latitude      *float64   `json:"latitude"`
+    Adults        *int32     `json:"adults"`
+    Children      *int32     `json:"children"`
+    NewAmenities  *[]string `json:"amenities"`
+    NewRules      *[]string `json:"rules"`
+   Amenities     json.RawMessage `json:"-"`
+    Rules         json.RawMessage `json:"-"`
     Longitude     *float64   `json:"longitude"`
     Status        *UnitStatus `json:"status"`
 }

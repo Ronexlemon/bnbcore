@@ -24,8 +24,8 @@ func NewBookingRepository(dbconn *db.PostgresConn) (*BookingRepository,error) {
 func (b *BookingRepository) Create(ctx context.Context, bk *booking.Booking) (*booking.Booking, error) {
 	query := `
 		INSERT INTO bookings (id, tenant_id, unit_id, guest_name, guest_email, guest_phone,
-		                      start_date, end_date, total_price, status, created_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())
+		                      start_date, end_date, total_price, status,guest_number, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10,$11, NOW())
 		RETURNING created_at
 	`
 	err := b.DbConnection.Pool.QueryRow(ctx, query,
@@ -39,6 +39,7 @@ func (b *BookingRepository) Create(ctx context.Context, bk *booking.Booking) (*b
 		bk.EndDate,
 		bk.TotalPrice,
 		bk.Status,
+		bk.GuestNumber,
 	).Scan(&bk.CreatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create booking: %w", err)
@@ -51,7 +52,7 @@ func (b *BookingRepository) GetByID(ctx context.Context, id, tenantID uuid.UUID)
 
 	query := `
 		SELECT id, tenant_id, unit_id, guest_name, guest_email, guest_phone,
-		       start_date, end_date, total_price, status, created_at
+		       start_date, end_date, total_price, status,guest_number, created_at
 		FROM bookings
 		WHERE id = $1
 		  AND tenant_id = $2
@@ -67,6 +68,7 @@ func (b *BookingRepository) GetByID(ctx context.Context, id, tenantID uuid.UUID)
 		&bk.EndDate,
 		&bk.TotalPrice,
 		&bk.Status,
+		&bk.GuestNumber,
 		&bk.CreatedAt,
 	)
 	if err != nil {
@@ -82,7 +84,7 @@ func (b *BookingRepository) GetByID(ctx context.Context, id, tenantID uuid.UUID)
 func (b *BookingRepository) GetAll(ctx context.Context, tenantID uuid.UUID) ([]*booking.Booking, error) {
 	query := `
 		SELECT id, tenant_id, unit_id, guest_name, guest_email, guest_phone,
-		       start_date, end_date, total_price, status, created_at
+		       start_date, end_date, total_price, status,guest_number, created_at
 		FROM bookings
 		WHERE tenant_id = $1
 		ORDER BY created_at DESC
@@ -107,6 +109,7 @@ func (b *BookingRepository) GetAll(ctx context.Context, tenantID uuid.UUID) ([]*
 			&bk.EndDate,
 			&bk.TotalPrice,
 			&bk.Status,
+			&bk.GuestNumber,
 			&bk.CreatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("failed to scan booking: %w", err)
@@ -121,7 +124,7 @@ func (b *BookingRepository) GetAll(ctx context.Context, tenantID uuid.UUID) ([]*
 func (b *BookingRepository) GetByUnit(ctx context.Context, unitID, tenantID uuid.UUID) ([]*booking.Booking, error) {
 	query := `
 		SELECT id, tenant_id, unit_id, guest_name, guest_email, guest_phone,
-		       start_date, end_date, total_price, status, created_at
+		       start_date, end_date, total_price, status,guest_number, created_at
 		FROM bookings
 		WHERE unit_id = $1
 		  AND tenant_id = $2
@@ -147,6 +150,7 @@ func (b *BookingRepository) GetByUnit(ctx context.Context, unitID, tenantID uuid
 			&bk.EndDate,
 			&bk.TotalPrice,
 			&bk.Status,
+			&bk.GuestNumber,
 			&bk.CreatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("failed to scan booking: %w", err)
@@ -164,7 +168,7 @@ func (b *BookingRepository) UpdateStatus(ctx context.Context, id, tenantID uuid.
 		WHERE id = $2
 		  AND tenant_id = $3
 		RETURNING id, tenant_id, unit_id, guest_name, guest_email, guest_phone,
-		          start_date, end_date, total_price, status, created_at
+		          start_date, end_date, total_price, status,guest_number, created_at
 	`
 	var bk booking.Booking
 	err := b.DbConnection.Pool.QueryRow(ctx, query, status, id, tenantID).Scan(
@@ -178,6 +182,7 @@ func (b *BookingRepository) UpdateStatus(ctx context.Context, id, tenantID uuid.
 		&bk.EndDate,
 		&bk.TotalPrice,
 		&bk.Status,
+		&bk.GuestNumber,
 		&bk.CreatedAt,
 	)
 	if err != nil {

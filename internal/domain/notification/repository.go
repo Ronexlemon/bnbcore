@@ -12,6 +12,7 @@ type Repository interface {
 	GetByTenant(ctx context.Context, tenantID uuid.UUID, limit, offset int) ([]*Notification, error)
 	GetByUser(ctx context.Context, userID uuid.UUID, limit, offset int) ([]*Notification, error)
 	GetUnread(ctx context.Context, userID uuid.UUID) ([]*Notification, error)
+	 MarkAllAsReadBatched(ctx context.Context, userID uuid.UUID, batchSize int) (int64, error)
 	MarkAsRead(ctx context.Context, id uuid.UUID) error
 	MarkAsSent(ctx context.Context, id uuid.UUID) error
 	MarkAsFailed(ctx context.Context, id uuid.UUID, reason string) error

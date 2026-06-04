@@ -247,4 +247,31 @@ func scanNotifications(rows pgx.Rows) ([]*notification.Notification, error) {
 	return notifications, nil
 }
 
+func (r *NotificationRepository) MarkAllAsReadBatched(ctx context.Context, userID uuid.UUID, batchSize int) (int64, error) {
+	if batchSize <= 0 {
+		batchSize = 20 
+	}
+
+	query := `
+		WITH target_notifications AS (
+			SELECT id 
+			FROM notifications
+			WHERE user_id = $1 
+			  AND status != 'read'::notification_status
+			LIMIT $2
+			FOR UPDATE SKIP LOCKED
+		)
+		UPDATE notifications SET 
+			status = 'read'::notification_status, 
+			read_at = NOW()
+		WHERE id IN (SELECT id FROM target_notifications)
+	`
+
+	tag, err := r.DbConnection.Pool.Exec(ctx, query, userID, batchSize)
+	if err != nil {
+		return 0, fmt.Errorf("failed to batch mark notifications as read: %w", err)
+	}
+
+	return tag.RowsAffected(), nil
+}
 var _ notification.Repository = (*NotificationRepository)(nil)

@@ -42,6 +42,7 @@ func (s *BookingService) CreateBooking(ctx context.Context, tenantID uuid.UUID, 
         GuestPhone: req.GuestPhone,
         StartDate:  req.StartDate,
         EndDate:    req.EndDate,
+        GuestNumber: req.GuestNumber,
         TotalPrice: nights, 
         Status:     BookingStatusPending,
     }

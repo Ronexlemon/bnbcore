@@ -41,6 +41,8 @@ func (h *NotificationHandler) registerRoutes() {
 
 	h.Server.Handle("PATCH "+api+"/notifications/{id}/read",
 		h.JWTAuthManager.Authenticate(http.HandlerFunc(h.MarkAsRead)))
+		h.Server.Handle("POST "+api+"/notifications/read-all",
+        h.JWTAuthManager.Authenticate(http.HandlerFunc(h.MarkAllAsRead)))
 
 }
 
@@ -151,6 +153,28 @@ func (h *NotificationHandler) MarkAsRead(w http.ResponseWriter, r *http.Request)
 	})
 }
 
+func (h *NotificationHandler) MarkAllAsRead(w http.ResponseWriter, r *http.Request) {
+    claims := auth.ClaimsFromContext(r.Context())
+    if claims == nil {
+        http.Error(w, "unauthorized", http.StatusUnauthorized)
+        return
+    }
+
+    userID, err := uuid.Parse(claims.UserID.String())
+    if err != nil {
+        http.Error(w, "invalid user id", http.StatusBadRequest)
+        return
+    }
+
+    if err := h.Service.MarkAllAsRead(r.Context(), userID); err != nil {
+        http.Error(w, err.Error(), http.StatusInternalServerError)
+        return
+    }
+
+    writeJSON(w, map[string]any{
+        "message": "all notifications successfully marked as read",
+    })
+}
 
 
 func parsePagination(r *http.Request) (limit, offset int) {

@@ -25,6 +25,7 @@ type Booking struct {
     StartDate  time.Time
     EndDate    time.Time
     TotalPrice float64
+    GuestNumber int32
     Status     BookingStatus
     CreatedAt  time.Time
 }
@@ -40,6 +41,7 @@ type CreateBookingRequest struct {
     UnitID     uuid.UUID `json:"unit_id"`
     GuestName  string    `json:"guest_name"`
     GuestEmail string    `json:"guest_email"`
+    GuestNumber int32    `json:"guest_number"`
     GuestPhone string    `json:"guest_phone"`
     StartDate  time.Time `json:"start_date"`
     EndDate    time.Time `json:"end_date"`

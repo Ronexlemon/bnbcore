@@ -1,8 +1,9 @@
-
 package notification
 
 import (
 	"context"
+	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -51,4 +52,28 @@ func (s *Service) MarkAsSent(ctx context.Context, id uuid.UUID) error {
 
 func (s *Service) MarkAsFailed(ctx context.Context, id uuid.UUID, reason string) error {
 	return s.Repo.MarkAsFailed(ctx, id, reason)
+}
+
+func (s *Service) MarkAllAsRead(ctx context.Context, userID uuid.UUID) error {
+	const batchSize = 20
+	const sleepInterval = 50 * time.Millisecond // Space out executions to avoid DB exhaustion
+
+	for {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+
+		rowsUpdated, err := s.Repo.MarkAllAsReadBatched(ctx, userID, batchSize)
+		if err != nil {
+			return fmt.Errorf("service failed to process batched status change: %w", err)
+		}
+
+		if rowsUpdated == 0 {
+			break
+		}
+
+		time.Sleep(sleepInterval)
+	}
+
+	return nil
 }
