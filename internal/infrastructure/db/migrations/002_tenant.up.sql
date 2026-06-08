@@ -43,6 +43,7 @@ CREATE TABLE tenants (
     shop_description TEXT NOT NULL,
     banner  TEXT ,
     long_description TEXT,
+    phone_number  TEXT,
     status        tenant_status DEFAULT 'trial',
     trial_ends_at TIMESTAMP NOT NULL DEFAULT now() + INTERVAL '14 days',
     created_at    TIMESTAMP DEFAULT now()

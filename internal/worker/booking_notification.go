@@ -6,31 +6,31 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"net/http"
-	"net/url"
-	"strings"
-
 	"github.com/ronexlemon/bnbcore/internal/domain/notification"
 	"github.com/ronexlemon/bnbcore/internal/eventstream"
+	"github.com/ronexlemon/bnbcore/internal/infrastructure/twilio"
 )
 
 type WhatsAppConfig struct {
 	AccountSID string
 	AuthToken  string
 	FromNumber string
+	TemplateSID  string
 }
 
 type BookingNotificationWorker struct {
 	Stream   *eventstream.KafkaClient
 	WhatsApp WhatsAppConfig
 	NotificationService *notification.Service
+	TwilioClient *twilio.Client
 }
 
-func NewBookingNotificationWorker(stream *eventstream.KafkaClient, wa WhatsAppConfig,notification_service *notification.Service) *BookingNotificationWorker {
+func NewBookingNotificationWorker(stream *eventstream.KafkaClient, wa WhatsAppConfig,notification_service *notification.Service,client *twilio.Client) *BookingNotificationWorker {
 	return &BookingNotificationWorker{
 		Stream:   stream,
 		WhatsApp: wa,
 		NotificationService: notification_service,
+		TwilioClient: client,
 	}
 }
 
@@ -95,25 +95,21 @@ func (w *BookingNotificationWorker) handleBookingCreated(ctx context.Context, ev
 		log.Printf("no phone number for booking %s, skipping WhatsApp notification", event.BookingID)
 		return
 	}
-
-	message := fmt.Sprintf(
-		"Hi %s! 🏠 Your booking at *%s* has been received.\n\n"+
-			"📅 Check-in:  %s\n"+
-			"📅 Check-out: %s\n"+
-			"💰 Total:     $%.2f\n\n"+
-			"We'll confirm your booking shortly. Thank you!",
-		event.GuestName,
-		event.UnitTitle,
-		event.StartDate.Format("Jan 02, 2006"),
-		event.EndDate.Format("Jan 02, 2006"),
-		event.TotalPrice,
-	)
-
-	if err := w.sendWhatsApp(ctx, event.GuestPhone, message); err != nil {
-		log.Printf("failed to send WhatsApp for booking %s: %v", event.BookingID, err)
-		_ = w.NotificationService.MarkAsFailed(ctx, notif.ID, err.Error())
-		return
-	}
+variables := map[string]string{
+        "1": event.GuestName,
+        "2": event.UnitTitle,
+        "3": event.StartDate.Format("Jan 02, 2006"),
+        "4": event.EndDate.Format("Jan 02, 2006"),
+        "5": fmt.Sprintf("%.2f", event.TotalPrice),
+        "6": event.BookingID.String(),          
+        "7": event.TenantID.String(),    
+    }
+	
+	if err := w.TwilioClient.SendWhatsAppTemplate(ctx, event.GuestPhone, variables); err != nil {
+        log.Printf("failed to send WhatsApp for booking %s: %v", event.BookingID, err)
+        _ = w.NotificationService.MarkAsFailed(ctx, notif.ID, err.Error())
+        return
+    }
 	_ = w.NotificationService.MarkAsSent(ctx, notif.ID)
 
 	log.Printf("WhatsApp notification sent for booking %s to %s", event.BookingID, event.GuestPhone)
@@ -142,34 +138,8 @@ func (w *BookingNotificationWorker) handleBookingStatus(ctx context.Context, eve
 		return
 	}
 
-	if err := w.sendWhatsApp(ctx, event.GuestPhone, message); err != nil {
+	if err := w.TwilioClient.SendWhatsApp(ctx, event.GuestPhone, message); err != nil {
 		log.Printf("failed to send WhatsApp status update for booking %s: %v", event.BookingID, err)
 	}
 }
 
-func (w *BookingNotificationWorker) sendWhatsApp(_ context.Context, toPhone, message string) error {
-	twilioURL := fmt.Sprintf("https://api.twilio.com/2010-04-01/Accounts/%s/Messages.json", w.WhatsApp.AccountSID)
-
-	data := url.Values{}
-	data.Set("From", w.WhatsApp.FromNumber)
-	data.Set("To", "whatsapp:"+toPhone)
-	data.Set("Body", message)
-
-	req, err := http.NewRequest(http.MethodPost, twilioURL, strings.NewReader(data.Encode()))
-	if err != nil {
-		return fmt.Errorf("failed to create request: %w", err)
-	}
-	req.SetBasicAuth(w.WhatsApp.AccountSID, w.WhatsApp.AuthToken)
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("failed to send WhatsApp: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode >= 400 {
-		return fmt.Errorf("twilio returned status %d", resp.StatusCode)
-	}
-	return nil
-}

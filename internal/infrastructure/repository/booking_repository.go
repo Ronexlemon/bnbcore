@@ -261,4 +261,57 @@ func (b *BookingRepository) GetBookedDates(ctx context.Context, unitID uuid.UUID
 	}
 	return ranges, nil
 }
+
+func (b *BookingRepository) FindConfirmedBookingsEndingOnDate(ctx context.Context, targetDate time.Time, lastID uuid.UUID, batchSize int) ([]*booking.Booking, error) {
+    
+    now := time.Now().UTC()
+    if targetDate.Before(time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)) {
+        targetDate = now
+    }
+
+    // Base query looking for active checkouts exactly on the targeted day
+    query := `
+        SELECT id, tenant_id, unit_id, guest_name, guest_email, guest_phone, start_date, end_date, total_price, status, created_at
+        FROM bookings
+        WHERE status = 'confirmed' 
+          AND end_date = $1
+    `
+    
+    var args []interface{}
+    args = append(args, targetDate.Format("2006-01-02"))
+
+    // Keyset Pagination anchor using correct SQL positional parameters
+    if lastID != uuid.Nil {
+        query += " AND id > $2 ORDER BY id ASC LIMIT $3"
+        args = append(args, lastID, batchSize)
+    } else {
+        query += " ORDER BY id ASC LIMIT $2"
+        args = append(args, batchSize)
+    }
+
+    rows, err := b.DbConnection.Pool.Query(ctx, query, args...)
+    if err != nil {
+        return nil, err
+    }
+    defer rows.Close()
+
+    var bookings []*booking.Booking
+    for rows.Next() {
+        var bkt booking.Booking
+        err := rows.Scan(
+            &bkt.ID, &bkt.TenantID, &bkt.UnitID, &bkt.GuestName, &bkt.GuestEmail, 
+            &bkt.GuestPhone, &bkt.StartDate, &bkt.EndDate, &bkt.TotalPrice, &bkt.Status, &bkt.CreatedAt,
+        )
+        if err != nil {
+            return nil, err
+        }
+        bookings = append(bookings, &bkt)
+    }
+
+    if err = rows.Err(); err != nil {
+        return nil, err
+    }
+
+    return bookings, nil
+}
 var _ booking.BookingRepository = (*BookingRepository)(nil)

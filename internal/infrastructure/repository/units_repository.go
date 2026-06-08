@@ -24,8 +24,8 @@ func NewUnitRepository(dbconn *db.PostgresConn) (*UnitRepository,error) {
 func (u *UnitRepository) Create(ctx context.Context, un *unit.Unit) (*unit.Unit, error) {
    
     query := `
-        INSERT INTO units (id, tenant_id, title, description,name,type, price_per_night, location, latitude, longitude, status,amenities, rules,adults,children, created_at, updated_at)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9,$10,$11,$12,$13,$14,$15, NOW(), NOW())
+        INSERT INTO units (id, tenant_id, title, description,name,type, price_per_night, location, latitude, longitude, status,amenities, rules,adults,children,phone_number, created_at, updated_at)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9,$10,$11,$12,$13,$14,$15,$16, NOW(), NOW())
         RETURNING created_at, updated_at
     `
     err := u.DbConnection.Pool.QueryRow(ctx, query,
@@ -44,6 +44,7 @@ func (u *UnitRepository) Create(ctx context.Context, un *unit.Unit) (*unit.Unit,
         un.Rules,
         un.Adults,
         un.Children,
+        un.PhoneNumber,
     ).Scan(&un.CreatedAt, &un.UpdatedAt)
     if err != nil {
         return nil, fmt.Errorf("failed to create unit: %w", err)
@@ -57,7 +58,7 @@ func (u *UnitRepository) GetByID(ctx context.Context, id, tenantID uuid.UUID) (*
 
     query := `
         SELECT id, tenant_id, title, description,name,type, price_per_night, location,
-               latitude, longitude, status,amenities, rules,adults,children, created_at, updated_at
+               latitude, longitude, status,amenities, rules,adults,children,phone_number, created_at, updated_at
         FROM units
         WHERE id = $1
           AND tenant_id = $2
@@ -79,6 +80,7 @@ func (u *UnitRepository) GetByID(ctx context.Context, id, tenantID uuid.UUID) (*
         &un.Rules,
         &un.Adults,
         &un.Children,
+        &un.PhoneNumber,
         &un.CreatedAt,
         &un.UpdatedAt,
     )
@@ -110,7 +112,7 @@ func (u *UnitRepository) GetAll(ctx context.Context, tenantID uuid.UUID, limit, 
 
     query := `
         SELECT id, tenant_id, title, description, name, type, price_per_night, location,
-               latitude, longitude, status, amenities, rules, adults, children, created_at, updated_at
+               latitude, longitude, status, amenities, rules, adults, children,phone_number, created_at, updated_at
         FROM units
         WHERE tenant_id = $1
        AND status != 'deleted'::unit_status
@@ -143,6 +145,7 @@ func (u *UnitRepository) GetAll(ctx context.Context, tenantID uuid.UUID, limit, 
             &un.Rules,
             &un.Adults,
             &un.Children,
+            &un.PhoneNumber,
             &un.CreatedAt,
             &un.UpdatedAt,
         ); err != nil {
@@ -168,7 +171,7 @@ func (u *UnitRepository) GetAll(ctx context.Context, tenantID uuid.UUID, limit, 
 
 func (u *UnitRepository) GetUnitByIdAndTenant(ctx context.Context, unitID uuid.UUID, tenantID uuid.UUID) (*unit.Unit, error) {
 	query := `
-		SELECT id, tenant_id, title, description,price_per_night,amenities, rules,adults,children, created_at, updated_at
+		SELECT id, tenant_id, title, description,price_per_night,amenities, rules,adults,children,phone_number, created_at, updated_at
 		FROM units
 		WHERE id = $1 AND tenant_id = $2
 	`
@@ -185,6 +188,7 @@ func (u *UnitRepository) GetUnitByIdAndTenant(ctx context.Context, unitID uuid.U
         &un.Rules,
         &un.Adults,
         &un.Children,
+        &un.PhoneNumber,
 		&un.CreatedAt,
 		&un.UpdatedAt,
 	)
@@ -215,13 +219,14 @@ func (u *UnitRepository) Update(ctx context.Context, id, tenantID uuid.UUID, req
             amenities       = COALESCE($10, amenities), 
             rules           = COALESCE($11, rules),
              adults           = COALESCE($12, adults),
-              children           = COALESCE($13, children),     
+              children           = COALESCE($13, children),  
+               phone_number           = COALESCE($14,phone_number),     
             updated_at      = NOW()
-        WHERE id = $14
-          AND tenant_id = $15
+        WHERE id = $15
+          AND tenant_id = $16
           AND status != 'deleted'
         RETURNING id, tenant_id, title, description, name, type, price_per_night, location,
-                  latitude, longitude, status, amenities, rules,adults,children, created_at, updated_at
+                  latitude, longitude, status, amenities, rules,adults,children,phone_number, created_at, updated_at
     `
     var un unit.Unit
     err := u.DbConnection.Pool.QueryRow(ctx, query,
@@ -238,6 +243,7 @@ func (u *UnitRepository) Update(ctx context.Context, id, tenantID uuid.UUID, req
         req.Rules,    
         req.Adults,
         req.Children, 
+        req.PhoneNumber,
         id,            
         tenantID,     
     ).Scan(
@@ -256,6 +262,7 @@ func (u *UnitRepository) Update(ctx context.Context, id, tenantID uuid.UUID, req
         &un.Rules,   
         &un.Adults,
         &un.Children,  
+        &un.PhoneNumber,
         &un.CreatedAt,
         &un.UpdatedAt,
     )

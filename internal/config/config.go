@@ -32,6 +32,7 @@ PASSWORD string
 FROM string
 REDIS_URL string
 CLOUDINARY_URL string
+TEMPLATE_SID string
 
 }
 
@@ -74,6 +75,7 @@ func Load() *Config {
 		USERNAME:strings.TrimSpace(os.Getenv("USERNAME")),
 		REDIS_URL:strings.TrimSpace(os.Getenv("REDIS_URL")),
 		CLOUDINARY_URL:strings.TrimSpace(os.Getenv("CLOUDINARY_URL")),
+		TEMPLATE_SID :strings.TrimSpace(os.Getenv("TEMPLATE_SID")),
 		
 
 	}

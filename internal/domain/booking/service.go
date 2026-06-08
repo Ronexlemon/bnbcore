@@ -1,12 +1,12 @@
-
-
 package booking
 
 import (
-    "context"
-    "errors"
-    "math"
-    "github.com/google/uuid"
+	"context"
+	"errors"
+	"math"
+	"time"
+
+	"github.com/google/uuid"
 )
 
 type BookingService struct {
@@ -71,4 +71,8 @@ func (s *BookingService) CancelBooking(ctx context.Context, id, tenantID uuid.UU
 }
 func (s *BookingService) GetBookedDates(ctx context.Context, unitID uuid.UUID) ([]*BookedRange, error) {
 	return s.Repo.GetBookedDates(ctx, unitID)
+}
+
+func (s *BookingService)FindConfirmedBookingsEndingOnDate(ctx context.Context, targetDate time.Time, lastID uuid.UUID, batchSize int) ([]*Booking, error){
+    return s.Repo.FindConfirmedBookingsEndingOnDate(ctx,targetDate,lastID,batchSize)
 }

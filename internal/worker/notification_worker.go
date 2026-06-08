@@ -53,7 +53,7 @@ func (w *NotificationWorker) Start(ctx context.Context) error {
 
 	return w.Stream.ConsumeEvents(ctx, topics, "general-notification-group", func(topic string, key, value []byte) {
     log.Printf("received event on topic: %s", topic)
-	fmt.Println("received event on topic: %s", topic)
+	
 
 
     switch topic {

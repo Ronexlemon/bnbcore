@@ -236,11 +236,13 @@ func (h *BookingHandler) UpdateStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if claims.TenantID == nil {
+	tenant:=tenant.FromContext(r.Context())
+
+	if tenant.ID == nil {
         http.Error(w,"complete workspace setup first" ,http.StatusPreconditionRequired)
         return
     }
-   tenantID := *claims.TenantID
+tenantID := *tenant.ID
 
 	result, err := h.Service.UpdateStatus(r.Context(), id, tenantID, req.Status)
 	if err != nil {

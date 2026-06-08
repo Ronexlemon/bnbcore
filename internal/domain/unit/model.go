@@ -26,6 +26,7 @@ type Unit struct {
     Amenities     json.RawMessage `json:"amenities"`
     Rules         json.RawMessage `json:"rules"` 
     Images        []UnitImage     `json:"images"`
+    PhoneNumber    string         `json:"phone_number"`
     CreatedAt     time.Time       `json:"created_at"`
     UpdatedAt     time.Time       `json:"updated_at"`
 }
@@ -48,6 +49,7 @@ type CreateUnitRequest struct {
     Adults        int32    `json:"adults"`
     Children      int32   `json:"children"`
     Amenities     []string `json:"amenities"`
+     PhoneNumber    string         `json:"phone_number"`
     Rules         []string `json:"rules"`
     Longitude     float64  `json:"longitude"`
     Images        []string `json:"images"` // URLs
@@ -65,6 +67,7 @@ type UpdateUnitRequest struct {
     Children      *int32     `json:"children"`
     NewAmenities  *[]string `json:"amenities"`
     NewRules      *[]string `json:"rules"`
+     PhoneNumber    string         `json:"phone_number"`
    Amenities     json.RawMessage `json:"-"`
     Rules         json.RawMessage `json:"-"`
     Longitude     *float64   `json:"longitude"`

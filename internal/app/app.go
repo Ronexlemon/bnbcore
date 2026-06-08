@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"log"
+	"log/slog"
 	"net/http"
 	"time"
+
 	"github.com/ronexlemon/bnbcore/internal/auth"
 	"github.com/ronexlemon/bnbcore/internal/auth/password"
 	"github.com/ronexlemon/bnbcore/internal/auth/token"
@@ -21,6 +23,7 @@ import (
 	"github.com/ronexlemon/bnbcore/internal/handler"
 	"github.com/ronexlemon/bnbcore/internal/infrastructure/db"
 	"github.com/ronexlemon/bnbcore/internal/infrastructure/repository"
+	"github.com/ronexlemon/bnbcore/internal/infrastructure/twilio"
 	"github.com/ronexlemon/bnbcore/internal/infrastructure/upload"
 	"github.com/ronexlemon/bnbcore/internal/senders"
 	"github.com/ronexlemon/bnbcore/internal/worker"
@@ -102,6 +105,8 @@ func NewMuxService(ctx context.Context) http.Handler {
         log.Fatalf("master key and active encryptedHex need needed: %v", err)
     }
 
+   twilio_client:= twilio.NewTwilioClient(twilio.Config{AccountSID: config_env.TWILIO_ACCOUNT_SID,AuthToken: config_env.TWILIO_ACCOUNT_SID,FromNumber: config_env.TWILIO_WHATSAPP_FROM,TemplateSID:config_env.TEMPLATE_SID})
+
     tenant_service := tenant.NewService(tenant_repo)
 	 sunscription_service := subscription.NewService(subscription_repo)
 	 notification_service := notification.NewService(notification_repo)
@@ -109,6 +114,7 @@ func NewMuxService(ctx context.Context) http.Handler {
 	unit_service_service := services.NewService(unit_service_repo)
 	booking_service := booking.NewBookingService(booking_repo)
     user_service := user.NewUserservice(user_repo, passwordEngine, tokenEngine, config_env.GOOGLE_CLIENT_ID)
+    
 
      _ = handler.NewTenantHandler(mux, tenant_service, jwtManager,subscription_repo,stream)
      _ = handler.NewUserHandler(mux, user_service, jwtManager,config_env.BASE_DOMAIN,stream,sender)
@@ -117,14 +123,17 @@ func NewMuxService(ctx context.Context) http.Handler {
 	 _ = handler.NewRoomServiceHandler(mux,unit_service_service, jwtManager,subscription_repo,stream)
 	 _ = handler.NewSubscriptionHandler(mux,sunscription_service, jwtManager,stream)
 	 _ = handler.NewNotificationHandler(mux,notification_service, jwtManager)
+     _=handler.NewTwilioWebhookHandler(handler.Config{TwilioAuthToken: config_env.TWILIO_AUTH_TOKEN},booking_service,new(slog.Logger),mux)
 
 	  waWorker := worker.NewBookingNotificationWorker(stream, worker.WhatsAppConfig{
         AccountSID: config_env.TWILIO_ACCOUNT_SID,
         AuthToken:  config_env.TWILIO_AUTH_TOKEN,
         FromNumber: config_env.TWILIO_WHATSAPP_FROM,
-    },notification_service)
+        TemplateSID: config_env.TEMPLATE_SID,
+    },notification_service,twilio_client)
 	subWorker := worker.NewSubscriptionExpiryWorker(subscription_repo,time.Duration(time.Second *30))
 	generalNotificationWorker := worker.NewNotificationWorker(stream,notification_service,sender)
+    checkoutNotificationWorker := worker.NewCheckoutNotificationWorker(booking_service,twilio_client,unit_service_service,tenant_service,100,time.Second*5)
     go func() {
         if err := waWorker.Start(workerCtx); err != nil {
             log.Printf("booking notification worker stopped: %v", err)
@@ -138,6 +147,11 @@ func NewMuxService(ctx context.Context) http.Handler {
 		 if err :=  generalNotificationWorker.Start(workerCtx); err != nil {
             log.Printf("general notification worker stopped: %v", err)
         }
+    }()
+    go func() {
+       
+		   checkoutNotificationWorker.Start(workerCtx)
+            log.Printf("general notification worker stopped: %v", err)
     }()
 
     return auth.SubdomainResolver(tenant_service, config_env.BASE_DOMAIN)(mux)

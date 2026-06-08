@@ -16,6 +16,8 @@ CREATE INDEX idx_units_lat_lng       ON units(latitude, longitude);
 -- BOOKING PERFORMANCE
 -- =========================
 CREATE INDEX idx_bookings_dates      ON bookings(start_date, end_date);
+CREATE INDEX idx_bookings_checkout_lookup 
+ON bookings (end_date, status, id);
 
 -- =========================
 -- SUBSCRIPTION CHECKS

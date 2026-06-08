@@ -29,6 +29,7 @@ CREATE TABLE units (
     description TEXT,
     adults INTEGER NOT NULL DEFAULT 0,
     children INTEGER NOT NULL DEFAULT 0,
+    phone_number TEXT,
 
     price_per_night NUMERIC NOT NULL,
 

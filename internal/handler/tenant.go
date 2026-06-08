@@ -16,6 +16,7 @@ type RegisterTenantRequest struct {
 	ShopDescription  string `json:"shop_description"`
 	Subdomain string `json:"subdomain"`
 	ShopName string `json:"name"`
+	PhoneNumber string `json:"phone_number"`
 	LongDescription string `json:"long_description"`
 }
 
@@ -90,7 +91,7 @@ func (h *TenantHandler) CreateTenant(w http.ResponseWriter, r *http.Request) {
 userID := *claims.UserID
 
 
-	 tenant_details,err := h.Service.CreateTenant(r.Context(),req.ShopName ,req.ShopDescription, req.Subdomain, userID,req.LongDescription)
+	 tenant_details,err := h.Service.CreateTenant(r.Context(),req.ShopName ,req.ShopDescription, req.Subdomain,req.PhoneNumber, userID,req.LongDescription)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return

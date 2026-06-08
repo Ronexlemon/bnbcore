@@ -28,6 +28,7 @@ type Tenant struct {
 	Subdomain   string       `json:"subdomain"`
 	Banner *string `json:"banner"`
 	LongDescription *string `json:"long_description"`
+	 PhoneNumber    string         `json:"phone_number"`
 	Status      TenantStatus `json:"status"`
 	TrialEndsAt time.Time    `json:"trial_ends_at"`
 	CreatedAt   time.Time    `json:"created_at"`
@@ -51,5 +52,6 @@ type UpdateTenantRequest struct {
 	Status    *TenantStatus `json:"status"`
 	Banner *string `json:"banner"`
 	LongDescription *string `json:"long_description"`
+	PhoneNumber    string         `json:"phone_number"`
 	ShopName *string `json:"name"`
 }
