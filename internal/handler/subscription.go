@@ -8,6 +8,7 @@ import (
 	"github.com/ronexlemon/bnbcore/internal/domain/subscription"
 	"github.com/ronexlemon/bnbcore/internal/domain/tenant"
 	"github.com/ronexlemon/bnbcore/internal/eventstream"
+	"github.com/ronexlemon/bnbcore/internal/metrics"
 )
 
 type SubscriptionHandler struct {
@@ -32,20 +33,20 @@ func (h *SubscriptionHandler) registerRoutes() {
 	api := "/api/v1"
 
 	// Public — show plans before login
-	h.Server.HandleFunc("GET "+api+"/subscriptions/plans", h.GetPlans)
+	h.Server.HandleFunc("GET "+api+"/subscriptions/plans", metrics.MetricsMiddleware(h.GetPlans))
 
 	// Protected
 	h.Server.Handle("POST "+api+"/subscriptions",
-		h.JWTAuthManager.Authenticate(http.HandlerFunc(h.Subscribe)))
+		h.JWTAuthManager.Authenticate(http.HandlerFunc(metrics.MetricsMiddleware(h.Subscribe))))
 
 	h.Server.Handle("GET "+api+"/subscriptions/me",
-		h.JWTAuthManager.Authenticate(http.HandlerFunc(h.GetMySubscription)))
+		h.JWTAuthManager.Authenticate(http.HandlerFunc(metrics.MetricsMiddleware(h.GetMySubscription))))
 
 	h.Server.Handle("PUT "+api+"/subscriptions/upgrade",
-		h.JWTAuthManager.Authenticate(http.HandlerFunc(h.Upgrade)))
+		h.JWTAuthManager.Authenticate(http.HandlerFunc(metrics.MetricsMiddleware(h.Upgrade))))
 
 	h.Server.Handle("PATCH "+api+"/subscriptions/cancel",
-		h.JWTAuthManager.Authenticate(http.HandlerFunc(h.Cancel)))
+		h.JWTAuthManager.Authenticate(http.HandlerFunc(metrics.MetricsMiddleware(h.Cancel))))
 }
 
 

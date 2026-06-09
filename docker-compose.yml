@@ -1,101 +1,4 @@
-# version: "3.9"
 
-# services:
-
-#   # =========================
-#   # POSTGRES DATABASE
-#   # =========================
-#   db:
-#     image: postgres:16
-#     container_name: bnbcore_postgres
-#     restart: always
-#     environment:
-#       POSTGRES_USER: postgres
-#       POSTGRES_PASSWORD: postgres
-#       POSTGRES_DB: lemon
-#     ports:
-#       - "5432:5432"
-#     volumes:
-#       - pgdata:/var/lib/postgresql/data
-#     healthcheck:
-#       test: ["CMD-SHELL", "pg_isready -U postgres"]
-#       interval: 5s
-#       timeout: 5s
-#       retries: 10
-
-#   # =========================
-#   # REDIS (CACHE / SESSIONS)
-#   # =========================
-#   redis:
-#     image: redis:7-alpine
-#     container_name: bnbcore_redis
-#     restart: always
-#     ports:
-#       - "6379:6379"
-#     command: ["redis-server", "--appendonly", "yes"]
-
-#   # =========================
-#   # KAFKA-LIKE EVENT STREAM (REDPANDA)
-#   # =========================
-#   redpanda:
-#     image: redpandadata/redpanda:latest
-#     container_name: bnbcore_redpanda
-#     restart: always
-#     command:
-#       - redpanda
-#       - start
-#       - --overprovisioned
-#       - --smp
-#       - "1"
-#       - --memory
-#       - "1G"
-#       - --reserve-memory
-#       - "0M"
-#       - --node-id
-#       - "0"
-#       - --check=false
-#     ports:
-#       - "9092:9092"
-#       - "9644:9644"
-
-#   # =========================
-#   # MIGRATIONS RUNNER
-#   # =========================
-#   migrate:
-#     image: migrate/migrate
-#     container_name: bnbcore_migrate
-#     depends_on:
-#       db:
-#         condition: service_healthy
-#     volumes:
-#       - ./internal/infrastructure/db/migrations:/migrations:ro
-#     command: -path=/migrations -database "postgres://postgres:postgres@db:5432/lemon?sslmode=disable" up
-
-#   # =========================
-#   # GO API SERVICE
-#   # =========================
-#   api:
-#     build:
-#       context: .
-#       dockerfile: docker/Dockerfile
-#     container_name: bnbcore_api
-#     restart: always
-#     depends_on:
-#       db:
-#         condition: service_healthy
-#       redis:
-#         condition: service_started
-#       redpanda:
-#         condition: service_started
-#       migrate:
-#         condition: service_completed_successfully
-#     ports:
-#       - "8080:8080"
-#     env_file:
-#       - .env
-
-# volumes:
-#   pgdata:
 
 version: "3.9"
 
@@ -113,7 +16,7 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: lemon
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -130,7 +33,7 @@ services:
     container_name: bnbcore_redis
     restart: always
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     command: ["redis-server", "--appendonly", "yes"]
 
   # =========================
@@ -157,7 +60,7 @@ services:
     depends_on:
       - zookeeper
     ports:
-      - "9092:9092"
+      - "127.0.0.1:9092:9092"
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
@@ -206,12 +109,39 @@ services:
       migrate:
         condition: service_completed_successfully
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"
     env_file:
       - .env
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: bnbcore_prometheus
+    restart: always
+    ports:
+      - "127.0.0.1:9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheusdata:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: bnbcore_grafana
+    restart: always
+    ports:
+      - "127.0.0.1:3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin  #todo remove this here
+    volumes:
+      - grafanadata:/var/lib/grafana
+    depends_on:
+      - prometheus
 
 volumes:
   pgdata:
   zookeeperdata:
   zookeeperlog:
   kafkadata:
+  prometheusdata:
+  grafanadata:

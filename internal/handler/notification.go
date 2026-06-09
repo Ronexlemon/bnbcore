@@ -1,5 +1,3 @@
-
-
 package handler
 
 import (
@@ -9,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/ronexlemon/bnbcore/internal/auth"
 	"github.com/ronexlemon/bnbcore/internal/domain/notification"
+	"github.com/ronexlemon/bnbcore/internal/metrics"
 )
 
 type NotificationHandler struct {
@@ -31,18 +30,18 @@ func (h *NotificationHandler) registerRoutes() {
 	api := "/api/v1"
 
 	h.Server.Handle("GET "+api+"/notifications",
-		h.JWTAuthManager.Authenticate(http.HandlerFunc(h.GetMyNotifications)))
+		h.JWTAuthManager.Authenticate(http.HandlerFunc(metrics.MetricsMiddleware(h.GetMyNotifications))))
 
 	h.Server.Handle("GET "+api+"/notifications/unread",
-		h.JWTAuthManager.Authenticate(http.HandlerFunc(h.GetUnread)))
+		h.JWTAuthManager.Authenticate(http.HandlerFunc(metrics.MetricsMiddleware(h.GetUnread))))
 
 	h.Server.Handle("GET "+api+"/notifications/unread/count",
-		h.JWTAuthManager.Authenticate(http.HandlerFunc(h.UnreadCount)))
+		h.JWTAuthManager.Authenticate(http.HandlerFunc(metrics.MetricsMiddleware(h.UnreadCount))))
 
 	h.Server.Handle("PATCH "+api+"/notifications/{id}/read",
-		h.JWTAuthManager.Authenticate(http.HandlerFunc(h.MarkAsRead)))
+		h.JWTAuthManager.Authenticate(http.HandlerFunc(metrics.MetricsMiddleware(h.MarkAsRead))))
 		h.Server.Handle("POST "+api+"/notifications/read-all",
-        h.JWTAuthManager.Authenticate(http.HandlerFunc(h.MarkAllAsRead)))
+        h.JWTAuthManager.Authenticate(http.HandlerFunc(metrics.MetricsMiddleware(h.MarkAllAsRead))))
 
 }
 

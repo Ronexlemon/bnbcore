@@ -10,6 +10,7 @@ import (
 	"github.com/ronexlemon/bnbcore/internal/domain/subscription"
 	"github.com/ronexlemon/bnbcore/internal/domain/tenant"
 	"github.com/ronexlemon/bnbcore/internal/eventstream"
+	"github.com/ronexlemon/bnbcore/internal/metrics"
 	"github.com/ronexlemon/bnbcore/internal/middleware"
 )
 
@@ -37,27 +38,27 @@ func (h *BookingHandler) registerRoutes() {
 	api := "/api/v1"
 
 	 protected := func(hf http.HandlerFunc) http.Handler {
-		return middleware.RequireActiveSubscription(h.SubRepo)(hf)
+		return middleware.RequireActiveSubscription(h.SubRepo)(metrics.MetricsMiddleware(hf))
 	}
-	h.Server.HandleFunc("GET "+api+"/units/{id}/availability", h.CheckAvailability)
+	h.Server.HandleFunc("GET "+api+"/units/{id}/availability", metrics.MetricsMiddleware(h.CheckAvailability))
 	h.Server.Handle("POST "+api+"/bookings",protected(h.CreateBooking))
-	h.Server.HandleFunc("GET "+api+"/units/{id}/booked-dates", h.GetBookedDates)
+	h.Server.HandleFunc("GET "+api+"/units/{id}/booked-dates", metrics.MetricsMiddleware(h.GetBookedDates))
 
 	h.Server.Handle("GET "+api+"/bookings",
-		h.JWTAuthManager.Authenticate(http.HandlerFunc(h.GetAllBookings)))
+		h.JWTAuthManager.Authenticate(http.HandlerFunc(metrics.MetricsMiddleware(h.GetAllBookings))))
 		
 
 	h.Server.Handle("GET "+api+"/bookings/{id}",
-		h.JWTAuthManager.Authenticate(http.HandlerFunc(h.GetBooking)))
+		h.JWTAuthManager.Authenticate(http.HandlerFunc(metrics.MetricsMiddleware(h.GetBooking))))
 
 	h.Server.Handle("GET "+api+"/units/{id}/bookings",
-		h.JWTAuthManager.Authenticate(http.HandlerFunc(h.GetBookingsByUnit)))
+		h.JWTAuthManager.Authenticate(http.HandlerFunc(metrics.MetricsMiddleware(h.GetBookingsByUnit))))
 
 	h.Server.Handle("PATCH "+api+"/bookings/{id}/status",
-		h.JWTAuthManager.Authenticate(http.HandlerFunc(h.UpdateStatus)))
+		h.JWTAuthManager.Authenticate(http.HandlerFunc(metrics.MetricsMiddleware(h.UpdateStatus))))
 
 	h.Server.Handle("PATCH "+api+"/bookings/{id}/cancel",
-		h.JWTAuthManager.Authenticate(http.HandlerFunc(h.CancelBooking)))
+		h.JWTAuthManager.Authenticate(http.HandlerFunc(metrics.MetricsMiddleware(h.CancelBooking))))
 }
 
 func (h *BookingHandler) CreateBooking(w http.ResponseWriter, r *http.Request) {

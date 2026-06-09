@@ -21,10 +21,12 @@ import (
 	"github.com/ronexlemon/bnbcore/internal/domain/user"
 	"github.com/ronexlemon/bnbcore/internal/eventstream"
 	"github.com/ronexlemon/bnbcore/internal/handler"
+	handlermetric "github.com/ronexlemon/bnbcore/internal/handler/metrics"
 	"github.com/ronexlemon/bnbcore/internal/infrastructure/db"
 	"github.com/ronexlemon/bnbcore/internal/infrastructure/repository"
 	"github.com/ronexlemon/bnbcore/internal/infrastructure/twilio"
 	"github.com/ronexlemon/bnbcore/internal/infrastructure/upload"
+	"github.com/ronexlemon/bnbcore/internal/metrics"
 	"github.com/ronexlemon/bnbcore/internal/senders"
 	"github.com/ronexlemon/bnbcore/internal/worker"
 )
@@ -62,7 +64,10 @@ func NewMuxService(ctx context.Context) http.Handler {
         log.Fatalf("Failed to connect to db: %v", err)
     }
 
+    
     mux := http.NewServeMux()
+
+    go metrics.StartRuntimeCollector(15 * time.Second)
 
     tenant_repo, err := repository.NewTenantRepository(conn)
     if err != nil {
@@ -94,6 +99,7 @@ func NewMuxService(ctx context.Context) http.Handler {
     if err != nil {
         log.Fatalf("Failed to initialize  notification repository: %v", err)
     }
+    
 
     passwordEngine, err := password.NewPasswordHasher(peppers, config_env.ACTIVE_PEPPER_VERSION)
     if err != nil {
@@ -124,6 +130,7 @@ func NewMuxService(ctx context.Context) http.Handler {
 	 _ = handler.NewSubscriptionHandler(mux,sunscription_service, jwtManager,stream)
 	 _ = handler.NewNotificationHandler(mux,notification_service, jwtManager)
      _=handler.NewTwilioWebhookHandler(handler.Config{TwilioAuthToken: config_env.TWILIO_AUTH_TOKEN},booking_service,new(slog.Logger),mux)
+     _=handlermetric.NewMetrics(mux)
 
 	  waWorker := worker.NewBookingNotificationWorker(stream, worker.WhatsAppConfig{
         AccountSID: config_env.TWILIO_ACCOUNT_SID,
@@ -154,5 +161,5 @@ func NewMuxService(ctx context.Context) http.Handler {
             log.Printf("general notification worker stopped: %v", err)
     }()
 
-    return auth.SubdomainResolver(tenant_service, config_env.BASE_DOMAIN)(mux)
+    return auth.CorsMiddleware(auth.SubdomainResolver(tenant_service, config_env.BASE_DOMAIN)(mux))
 }

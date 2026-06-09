@@ -8,6 +8,7 @@ import (
 	"github.com/ronexlemon/bnbcore/internal/auth"
 	"github.com/ronexlemon/bnbcore/internal/domain/user"
 	"github.com/ronexlemon/bnbcore/internal/eventstream"
+	"github.com/ronexlemon/bnbcore/internal/metrics"
 	"github.com/ronexlemon/bnbcore/internal/senders"
 )
 
@@ -43,16 +44,16 @@ func NewUserHandler(server *http.ServeMux, service *user.UserService, manager *a
 
 func (h *UserHandler) registerRoutes() {
     api := "/api/v1"
-    h.Server.HandleFunc("POST "+api+"/users/register", h.CreateUser)
-    h.Server.HandleFunc("GET  "+api+"/auth/verify",      h.VerifyMagicLink)        
-h.Server.HandleFunc("POST "+api+"/auth/resend",      h.ResendVerification)  
-    h.Server.HandleFunc("POST "+api+"/users/login", h.LoginHandler)
-    h.Server.HandleFunc("POST "+api+"/auth/google", h.GoogleAuth) 
-    h.Server.HandleFunc("POST "+api+"/auth/refresh", h.RefreshHandler)
-    h.Server.HandleFunc("GET "+api+"/users/{id}", h.GetUser)
-    h.Server.Handle("GET "+api+"/users/me", h.JWTAuthManager.Authenticate(http.HandlerFunc(h.GetMe)))
-    h.Server.Handle("PUT "+api+"/users/{id}", h.JWTAuthManager.Authenticate(http.HandlerFunc(h.UpdateUser)))
-    h.Server.Handle("DELETE "+api+"/users/{id}", h.JWTAuthManager.Authenticate(h.JWTAuthManager.RequireRole("owner")(http.HandlerFunc(h.DeleteUser))))
+    h.Server.HandleFunc("POST "+api+"/users/register",metrics.MetricsMiddleware(h.CreateUser))
+    h.Server.HandleFunc("GET  "+api+"/auth/verify",  metrics.MetricsMiddleware(h.VerifyMagicLink))      
+h.Server.HandleFunc("POST "+api+"/auth/resend",     metrics.MetricsMiddleware(h.ResendVerification)) 
+    h.Server.HandleFunc("POST "+api+"/users/login", metrics.MetricsMiddleware(h.LoginHandler))
+    h.Server.HandleFunc("POST "+api+"/auth/google", metrics.MetricsMiddleware(h.GoogleAuth)) 
+    h.Server.HandleFunc("POST "+api+"/auth/refresh", metrics.MetricsMiddleware(h.RefreshHandler))
+    h.Server.HandleFunc("GET "+api+"/users/{id}", metrics.MetricsMiddleware(h.GetUser))
+    h.Server.Handle("GET "+api+"/users/me", h.JWTAuthManager.Authenticate(http.HandlerFunc( metrics.MetricsMiddleware(h.GetMe))))
+    h.Server.Handle("PUT "+api+"/users/{id}", h.JWTAuthManager.Authenticate(http.HandlerFunc(metrics.MetricsMiddleware(h.UpdateUser))))
+    h.Server.Handle("DELETE "+api+"/users/{id}", h.JWTAuthManager.Authenticate(h.JWTAuthManager.RequireRole("owner")(http.HandlerFunc(metrics.MetricsMiddleware(h.DeleteUser)))))
 }
 
 
@@ -65,9 +66,11 @@ func (h *UserHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 
     usr, err := h.Service.Register(r.Context(), req.Email, req.Password)
     if err != nil {
+        metrics.UserRegistrationsTotal.WithLabelValues("failure").Inc()
         http.Error(w, err.Error(), http.StatusBadRequest)
         return
     }
+    metrics.UserRegistrationsTotal.WithLabelValues("success").Inc()
 
     token, err := h.Service.CreateMagicLinkToken(r.Context(), usr.ID)
     if err != nil {
@@ -78,9 +81,12 @@ func (h *UserHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
     link := fmt.Sprintf("%s/auth/verify?token=%s", h.BaseUrl, token)
 
     if err := h.EmailSender.Send(senders.EmailPayload{To: usr.Email,Body: link}); err != nil {
+        metrics.VerificationEmailsTotal.WithLabelValues("failure").Inc()
         http.Error(w, "could not send verification email", http.StatusInternalServerError)
         return
     }
+    metrics.MagicLinksIssuedTotal.WithLabelValues("registration").Inc()
+	metrics.VerificationEmailsTotal.WithLabelValues("success").Inc()
 w.WriteHeader(http.StatusAccepted)
     json.NewEncoder(w).Encode(map[string]string{
         "message": "check your email to complete sign-up",
@@ -97,9 +103,11 @@ func (h *UserHandler) VerifyMagicLink(w http.ResponseWriter, r *http.Request) {
 
     usr, err := h.Service.ValidateMagicLinkToken(r.Context(), token)
     if err != nil {
+        metrics.MagicLinksVerifiedTotal.WithLabelValues("invalid").Inc()
         http.Error(w, "invalid or expired link", http.StatusUnauthorized)
         return
     }
+    metrics.MagicLinksVerifiedTotal.WithLabelValues("success").Inc()
 
     h.issueTokens(w, r, usr)
 }
@@ -138,10 +146,12 @@ func (h *UserHandler) ResendVerification(w http.ResponseWriter, r *http.Request)
 
     link := fmt.Sprintf("%s/auth/verify?token=%s", h.BaseUrl, token)
     if err := h.EmailSender.Send(senders.EmailPayload{To: usr.Email,Body: link}); err != nil {
+        metrics.VerificationEmailsTotal.WithLabelValues("failure").Inc()
         http.Error(w, "could not send verification email", http.StatusInternalServerError)
         return
     }
-
+metrics.MagicLinksIssuedTotal.WithLabelValues("resend").Inc()
+	metrics.VerificationEmailsTotal.WithLabelValues("success").Inc()
     w.WriteHeader(http.StatusAccepted)
     json.NewEncoder(w).Encode(map[string]string{
         "message": "if that email is registered, a new link is on its way",
@@ -150,16 +160,19 @@ func (h *UserHandler) ResendVerification(w http.ResponseWriter, r *http.Request)
 func (h *UserHandler) LoginHandler(w http.ResponseWriter, r *http.Request) {
     var req user.User
     if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+        metrics.UserLoginsTotal.WithLabelValues("password", "failure").Inc()
         http.Error(w, "invalid body", http.StatusBadRequest)
         return
     }
 
     userResult, err := h.Service.Login(r.Context(), req.Email, req.Password)
     if err != nil {
+        metrics.UserLoginsTotal.WithLabelValues("password", "failure").Inc()
         http.Error(w, err.Error(), http.StatusUnauthorized)
         return
     }
     if !userResult.IsActive {
+        metrics.UserLoginsTotal.WithLabelValues("password", "unverified").Inc()
          token, err := h.Service.CreateMagicLinkToken(r.Context(), userResult.ID)
     if err != nil {
         http.Error(w, "could not create verification link", http.StatusInternalServerError)
@@ -168,12 +181,16 @@ func (h *UserHandler) LoginHandler(w http.ResponseWriter, r *http.Request) {
 
     link := fmt.Sprintf("%s/auth/verify?token=%s", h.BaseUrl, token)
     if err := h.EmailSender.Send(senders.EmailPayload{To: userResult.Email,Body: link}); err != nil {
+        metrics.VerificationEmailsTotal.WithLabelValues("failure").Inc()
         http.Error(w, "could not send verification email", http.StatusInternalServerError)
         return
     }
+    metrics.MagicLinksIssuedTotal.WithLabelValues("login_unverified").Inc()
+		metrics.VerificationEmailsTotal.WithLabelValues("success").Inc()
         http.Error(w, "email not verified — check your inbox", http.StatusForbidden)
         return
     }
+    metrics.UserLoginsTotal.WithLabelValues("password", "success").Inc()
 
     h.issueTokens(w, r, userResult)
 }

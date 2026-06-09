@@ -10,6 +10,7 @@ import (
 	"github.com/ronexlemon/bnbcore/internal/domain/subscription"
 	"github.com/ronexlemon/bnbcore/internal/domain/tenant"
 	"github.com/ronexlemon/bnbcore/internal/eventstream"
+	"github.com/ronexlemon/bnbcore/internal/metrics"
 )
 
 type RegisterTenantRequest struct {
@@ -51,19 +52,19 @@ func (h *TenantHandler) registerHandler() {
 	// 	)
 	// }
 	h.Server.Handle("POST "+api+"/tenant",
-		h.JWTAuthManager.Authenticate(http.HandlerFunc(h.CreateTenant)))
+		h.JWTAuthManager.Authenticate(http.HandlerFunc(metrics.MetricsMiddleware(h.CreateTenant))))
 
 	h.Server.Handle("GET "+api+"/tenant",
-		h.JWTAuthManager.Authenticate(http.HandlerFunc(h.GetTenant)))
+		h.JWTAuthManager.Authenticate(http.HandlerFunc(metrics.MetricsMiddleware(h.GetTenant))))
 
 	h.Server.Handle("PUT "+api+"/tenant/{id}",
-		h.JWTAuthManager.Authenticate(http.HandlerFunc(h.UpdateTenant)))
+		h.JWTAuthManager.Authenticate(http.HandlerFunc(metrics.MetricsMiddleware(h.UpdateTenant))))
 
 	h.Server.Handle("DELETE "+api+"/tenant/{id}",
-		h.JWTAuthManager.Authenticate(http.HandlerFunc(h.DeleteTenant)))
+		h.JWTAuthManager.Authenticate(http.HandlerFunc(metrics.MetricsMiddleware(h.DeleteTenant))))
 
 	h.Server.Handle("GET "+api+"/tenant/{id}",
-		h.JWTAuthManager.Authenticate(http.HandlerFunc(h.GetTenantByID)))
+		h.JWTAuthManager.Authenticate(http.HandlerFunc(metrics.MetricsMiddleware(h.GetTenantByID))))
 }
 
 func (h *TenantHandler) CreateTenant(w http.ResponseWriter, r *http.Request) {

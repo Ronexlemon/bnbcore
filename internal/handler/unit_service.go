@@ -3,12 +3,14 @@ package handler
 import (
 	"encoding/json"
 	"net/http"
+
 	"github.com/google/uuid"
 	"github.com/ronexlemon/bnbcore/internal/auth"
 	rs "github.com/ronexlemon/bnbcore/internal/domain/services"
 	"github.com/ronexlemon/bnbcore/internal/domain/subscription"
 	"github.com/ronexlemon/bnbcore/internal/domain/tenant"
 	"github.com/ronexlemon/bnbcore/internal/eventstream"
+	"github.com/ronexlemon/bnbcore/internal/metrics"
 	"github.com/ronexlemon/bnbcore/internal/middleware"
 )
 
@@ -37,21 +39,21 @@ func (h *RoomServiceHandler) registerRoutes() {
 
 	protected := func(hf http.HandlerFunc) http.Handler {
 		return h.JWTAuthManager.Authenticate(
-			middleware.RequireActiveSubscription(h.SubRepo)(hf),
+			middleware.RequireActiveSubscription(h.SubRepo)(metrics.MetricsHandler(hf)),
 		)
 	}
     h.Server.Handle("POST "+api+"/units/{unit_id}/unit-services",protected(h.Create))
 
     h.Server.Handle("GET "+api+"/units/{unit_id}/unit-services",
-        h.JWTAuthManager.Authenticate(http.HandlerFunc(h.GetByUnit)))
+        h.JWTAuthManager.Authenticate(http.HandlerFunc(metrics.MetricsMiddleware(h.GetByUnit))))
 
     h.Server.Handle("GET "+api+"/unit-services/{id}",
-        h.JWTAuthManager.Authenticate(http.HandlerFunc(h.GetByID)))
+        h.JWTAuthManager.Authenticate(http.HandlerFunc(metrics.MetricsMiddleware(h.GetByID))))
 
     h.Server.Handle("PUT "+api+"/unit-services/{id}",
-        h.JWTAuthManager.Authenticate(http.HandlerFunc(h.Update)))
+        h.JWTAuthManager.Authenticate(http.HandlerFunc(metrics.MetricsMiddleware(h.Update))))
 
-    h.Server.Handle("DELETE "+api+"/unit-services/{id}",protected(h.Delete))
+    h.Server.Handle("DELETE "+api+"/unit-services/{id}",protected(metrics.MetricsMiddleware(h.Delete)))
        
 }
 

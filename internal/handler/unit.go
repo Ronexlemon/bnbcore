@@ -14,6 +14,7 @@ import (
 	"github.com/ronexlemon/bnbcore/internal/domain/unit"
 	"github.com/ronexlemon/bnbcore/internal/eventstream"
 	"github.com/ronexlemon/bnbcore/internal/infrastructure/upload"
+	"github.com/ronexlemon/bnbcore/internal/metrics"
 	"github.com/ronexlemon/bnbcore/internal/middleware"
 )
 
@@ -44,15 +45,15 @@ func (h *UnitHandler) registerRoutes() {
 
 	protected := func(hf http.HandlerFunc) http.Handler {
 		return h.JWTAuthManager.Authenticate(
-			middleware.RequireActiveSubscription(h.SubRepo)(hf),
+			middleware.RequireActiveSubscription(h.SubRepo)(metrics.MetricsMiddleware(hf)),
 		)
 	}
 	
-	h.Server.HandleFunc("GET "+api+"/units", h.GetAllUnits)
-	h.Server.HandleFunc("GET "+api+"/units/{identifier}", h.GetUnitByIdentifier)
-	h.Server.HandleFunc("GET "+api+"/units/{id}/images", h.GetUnitImages)
+	h.Server.HandleFunc("GET "+api+"/units",metrics.MetricsMiddleware(h.GetAllUnits))
+	h.Server.HandleFunc("GET "+api+"/units/{identifier}", metrics.MetricsMiddleware(h.GetUnitByIdentifier))
+	h.Server.HandleFunc("GET "+api+"/units/{id}/images", metrics.MetricsMiddleware(h.GetUnitImages))
 
-	h.Server.Handle("POST "+api+"/units",protected(h.CreateUnit))
+	h.Server.Handle("POST "+api+"/units",protected(metrics.MetricsMiddleware(h.CreateUnit)))
 
 
 	h.Server.Handle("PUT "+api+"/units/{id}",protected(h.UpdateUnit))
@@ -62,7 +63,7 @@ func (h *UnitHandler) registerRoutes() {
 	h.Server.Handle("POST "+api+"/units/{id}/images",protected(h.AddImage))
 
 	h.Server.Handle("DELETE "+api+"/units/{id}/images/{image_id}",
-	 h.JWTAuthManager.Authenticate(http.HandlerFunc(h.RemoveImage)))
+	 h.JWTAuthManager.Authenticate(http.HandlerFunc(metrics.MetricsMiddleware(h.RemoveImage))))
 
 }
 
