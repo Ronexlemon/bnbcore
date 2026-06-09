@@ -53,7 +53,7 @@ func (w *CheckoutNotificationWorker) Start(ctx context.Context) {
 
         case <-ticker.C:
               w.ProcessTodayCheckouts(ctx)
-                log.Printf("worker error: %v")
+                log.Printf("worker notificaion started")
             
         }
     }

@@ -11,6 +11,7 @@ CREATE INDEX idx_bookings_tenant_id  ON bookings(tenant_id);
 -- =========================
 CREATE INDEX idx_units_location      ON units(location);
 CREATE INDEX idx_units_lat_lng       ON units(latitude, longitude);
+CREATE UNIQUE INDEX idx_units_tenant_slug ON units (tenant_id, slug);
 
 -- =========================
 -- BOOKING PERFORMANCE

@@ -23,26 +23,51 @@ CREATE TABLE units (
     id UUID PRIMARY KEY,
     tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE,
 
-    title TEXT NOT NULL,
-    name TEXT NOT NULL,
-    type text NOT NULL,
-    description TEXT,
-    adults INTEGER NOT NULL DEFAULT 0,
-    children INTEGER NOT NULL DEFAULT 0,
-    phone_number TEXT,
+   -- Identity
+    name                TEXT NOT NULL,
+    title               TEXT NOT NULL,
+    short_description   TEXT,
+    description         TEXT,
+    slug                TEXT NOT NULL,
+    type                TEXT NOT NULL ,
 
-    price_per_night NUMERIC NOT NULL,
+    -- Capacity
+    guests              INTEGER NOT NULL DEFAULT 1,
+    bedrooms            INTEGER NOT NULL DEFAULT 0,
+    beds                INTEGER NOT NULL DEFAULT 0,
+    bathrooms           INTEGER NOT NULL DEFAULT 0,
 
-    location TEXT,
-    latitude DOUBLE PRECISION,
-    longitude DOUBLE PRECISION,
+    -- Location
+    location            TEXT,
+    latitude            DOUBLE PRECISION,
+    longitude           DOUBLE PRECISION,
+    apartment_name      TEXT,
+    house_number        TEXT,
+    floor               TEXT,
+    access_note         TEXT,
 
-    status unit_status DEFAULT 'active',
-    amenities JSONB NOT NULL DEFAULT '{}',
-    rules JSONB NOT NULL DEFAULT '{}',
+    -- Pricing
+    price_weekday       NUMERIC NOT NULL DEFAULT 0,
+    price_weekend       NUMERIC NOT NULL DEFAULT 0,
 
-    created_at TIMESTAMP DEFAULT now(),
-    updated_at TIMESTAMP DEFAULT now()
+    -- Check-in / Check-out
+    checkin_time        TIME,
+    checkout_time       TIME,
+
+    -- Flexible content
+    amenities           JSONB NOT NULL DEFAULT '[]',
+    rules               JSONB NOT NULL DEFAULT '[]',
+
+    -- Contact
+    phone_number        TEXT,
+
+    -- Status
+    status              unit_status DEFAULT 'active',
+
+    created_at          TIMESTAMP DEFAULT now(),
+    updated_at          TIMESTAMP DEFAULT now(),
+
+    UNIQUE(tenant_id, slug)
 );
 
 
@@ -51,6 +76,7 @@ CREATE TABLE unit_images (
     id UUID PRIMARY KEY,
     unit_id UUID REFERENCES units(id) ON DELETE CASCADE,
     url TEXT NOT NULL,
+    sort_order  INTEGER DEFAULT 0,
     image_type TEXT NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );

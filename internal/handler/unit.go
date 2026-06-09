@@ -49,7 +49,7 @@ func (h *UnitHandler) registerRoutes() {
 	}
 	
 	h.Server.HandleFunc("GET "+api+"/units", h.GetAllUnits)
-	h.Server.HandleFunc("GET "+api+"/units/{id}", h.GetUnit)
+	h.Server.HandleFunc("GET "+api+"/units/{identifier}", h.GetUnitByIdentifier)
 	h.Server.HandleFunc("GET "+api+"/units/{id}/images", h.GetUnitImages)
 
 	h.Server.Handle("POST "+api+"/units",protected(h.CreateUnit))
@@ -207,6 +207,69 @@ tenantID := *t.ID
 	writeJSON(w, map[string]any{
 		"data": result,
 	})
+}
+func (h *UnitHandler) GetUnitBySlug(w http.ResponseWriter, r *http.Request) {
+	t := tenant.FromContext(r.Context())
+	if t == nil {
+		http.Error(w, "tenant not found", http.StatusBadRequest)
+		return
+	}
+
+	if t.ID == nil {
+		http.Error(w, "complete workspace setup first", http.StatusPreconditionRequired)
+		return
+	}
+	tenantID := *t.ID
+
+	slug := r.PathValue("slug")
+	if slug == "" {
+		http.Error(w, "invalid slug", http.StatusBadRequest)
+		return
+	}
+
+	result, err := h.Service.GetBySlug(r.Context(), slug, tenantID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+
+	writeJSON(w, map[string]any{
+		"data": result,
+	})
+}
+
+func (h *UnitHandler) GetUnitByIdentifier(w http.ResponseWriter, r *http.Request) {
+	t := tenant.FromContext(r.Context())
+	if t == nil || t.ID == nil {
+		http.Error(w, "tenant not found", http.StatusBadRequest)
+		return
+	}
+	tenantID := *t.ID
+
+	identifier := r.PathValue("identifier")
+	if identifier == "" {
+		http.Error(w, "missing identifier", http.StatusBadRequest)
+		return
+	}
+
+	if id, err := uuid.Parse(identifier); err == nil {
+		result, err := h.Service.GetUnit(r.Context(), id, tenantID)
+		if err != nil {
+			http.Error(w, "unit not found", http.StatusNotFound)
+			return
+		}
+
+		writeJSON(w, map[string]any{"data": result})
+		return
+	}
+
+	result, err := h.Service.GetBySlug(r.Context(), identifier, tenantID)
+	if err != nil {
+		http.Error(w, "unit not found", http.StatusNotFound)
+		return
+	}
+
+	writeJSON(w, map[string]any{"data": result})
 }
 
 func (h *UnitHandler) UpdateUnit(w http.ResponseWriter, r *http.Request) {
