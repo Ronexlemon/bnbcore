@@ -33,13 +33,13 @@ func NewUserservice(repo UserRepository,passEngine *password.PasswordHasher,toke
 
 func (u *UserService) Register(ctx context.Context, email, password string) (*User, error) {
 
-    
-    exists, err := u.Repo.EmailExists(ctx, email)
-    if err != nil {
-        return nil, fmt.Errorf("registration failed: %w", err)
-    }
-    if exists {
-        return nil, errors.New("Invalid Credentials")
+    existingUser, err := u.Repo.GetUserByEmail(ctx, email)
+    if err == nil && existingUser != nil {
+        if existingUser.IsActive {
+            return nil, errors.New("email is already registered")
+        }
+        
+        return existingUser, nil
     }
 
     hashedPassword, err := u.PasswordEngine.Hash(password)
@@ -99,6 +99,7 @@ fmt.Println("Pass and email",password,email)
 			_ = u.Repo.UpdatePasswordHash(ctx, userResult.ID, newHash)
 		}
 	}
+	userResult.PasswordHash = ""
 
 	return userResult, nil
 
@@ -133,7 +134,7 @@ func (s *UserService) CreateMagicLinkToken(ctx context.Context, userID uuid.UUID
         return "", err
     }
 
-    expiresAt := time.Now().Add(30 * time.Minute)
+    expiresAt := time.Now().UTC().Add(30 * time.Minute)
 
     if err := s.Repo.StoreMagicLinkToken(ctx, userID, tokenHash, expiresAt); err != nil {
         return "", err
@@ -144,16 +145,20 @@ func (s *UserService) CreateMagicLinkToken(ctx context.Context, userID uuid.UUID
 
 func (s *UserService) ValidateMagicLinkToken(ctx context.Context, rawToken string) (*User, error) {
     record, err := s.Repo.FindMagicLinkToken(ctx, rawToken)
+	fmt.Println("The record",record)
     if err != nil {
+		fmt.Println("The Error",err)
         return nil, err
     }
 
     if err := s.Repo.DeleteMagicLinkToken(ctx, rawToken); err != nil {
+		fmt.Println("The Delete error",err)
         return nil, err
     }
 
     // Activate the account on first verified click
     if err := s.Repo.ActivateUser(ctx, record.UserID); err != nil {
+		fmt.Println("Activate error",err)
         return nil, err
     }
 

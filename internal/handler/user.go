@@ -28,6 +28,10 @@ type RegisterRequest struct {
     Email     string `json:"email"`
     Password  string `json:"password"`
 }
+type LoginRequest struct {
+    Email    string `json:"email"`
+    Password string `json:"password"`
+}
 
 func NewUserHandler(server *http.ServeMux, service *user.UserService, manager *auth.JwtManager, base string,stream  *eventstream.KafkaClient,email *senders.Sender) *UserHandler {
     h := &UserHandler{
@@ -58,6 +62,7 @@ h.Server.HandleFunc("POST "+api+"/auth/resend",     metrics.MetricsMiddleware(h.
 
 
 func (h *UserHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
+    defer r.Body.Close()
     var req RegisterRequest
     if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
         http.Error(w, "invalid body format", http.StatusBadRequest)
@@ -87,11 +92,11 @@ func (h *UserHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
     }
     metrics.MagicLinksIssuedTotal.WithLabelValues("registration").Inc()
 	metrics.VerificationEmailsTotal.WithLabelValues("success").Inc()
+
+w.Header().Set("Content-Type", "application/json")
 w.WriteHeader(http.StatusAccepted)
-    json.NewEncoder(w).Encode(map[string]string{
-        "message": "check your email to complete sign-up",
-    })
-	//h.issueTokens(w, r, usr)
+writeJSON(w,map[string]string{"message":"check your email to complete sign-up"})
+
 }
 
 func (h *UserHandler) VerifyMagicLink(w http.ResponseWriter, r *http.Request) {
@@ -103,6 +108,7 @@ func (h *UserHandler) VerifyMagicLink(w http.ResponseWriter, r *http.Request) {
 
     usr, err := h.Service.ValidateMagicLinkToken(r.Context(), token)
     if err != nil {
+        fmt.Println("VERIFICATION ERROR",err)
         metrics.MagicLinksVerifiedTotal.WithLabelValues("invalid").Inc()
         http.Error(w, "invalid or expired link", http.StatusUnauthorized)
         return
@@ -158,7 +164,7 @@ metrics.MagicLinksIssuedTotal.WithLabelValues("resend").Inc()
     })
 }
 func (h *UserHandler) LoginHandler(w http.ResponseWriter, r *http.Request) {
-    var req user.User
+    var req LoginRequest
     if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
         metrics.UserLoginsTotal.WithLabelValues("password", "failure").Inc()
         http.Error(w, "invalid body", http.StatusBadRequest)
@@ -238,7 +244,7 @@ func (h *UserHandler) RefreshHandler(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    _, newAccess, err := h.JWTAuthManager.RefreshAccessToken(body.RefreshToken, usr.Email, usr.Role, usr.Subdomain)
+    _, newAccess, err := h.JWTAuthManager.RefreshAccessToken(body.RefreshToken, usr.Email, usr.Role)
     if err != nil {
         http.Error(w, "invalid or expired refresh token", http.StatusUnauthorized)
         return
@@ -309,6 +315,7 @@ func (h *UserHandler) issueTokens(w http.ResponseWriter, r *http.Request, usr *u
     writeJSON(w, map[string]any{
         "access_token":  pair.AccessToken,
         "refresh_token": pair.RefreshToken,
+        "data":usr,
     })
 }
 

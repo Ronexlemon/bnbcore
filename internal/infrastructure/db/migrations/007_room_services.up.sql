@@ -6,6 +6,6 @@ CREATE TABLE room_services (
     mobile      TEXT NOT NULL,
     email       TEXT,
     is_active   BOOLEAN DEFAULT true,
-    created_at  TIMESTAMP DEFAULT now(),
-    updated_at  TIMESTAMP DEFAULT now()
+    created_at  TIMESTAMPTZ DEFAULT now(),
+    updated_at  TIMESTAMPTZ DEFAULT now()
 );

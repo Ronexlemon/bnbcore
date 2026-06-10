@@ -25,9 +25,9 @@ CREATE TABLE subscriptions (
     amount               NUMERIC NOT NULL,
     currency             TEXT DEFAULT 'KES',
     billing_cycle TEXT NOT NULL DEFAULT 'monthly',
-    current_period_start TIMESTAMP,
-    current_period_end   TIMESTAMP,
-    created_at           TIMESTAMP DEFAULT now()
+    current_period_start TIMESTAMPTZ,
+    current_period_end   TIMESTAMPTZ,
+    created_at           TIMESTAMPTZ DEFAULT now()
 );
 
 -- =========================
@@ -47,5 +47,5 @@ CREATE TABLE revenue (
 
     status TEXT, -- pending | success | failed
 
-    created_at TIMESTAMP DEFAULT now()
+    created_at TIMESTAMPTZ DEFAULT now()
 );

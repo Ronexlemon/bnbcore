@@ -45,6 +45,6 @@ CREATE TABLE tenants (
     long_description TEXT,
     phone_number  TEXT,
     status        tenant_status DEFAULT 'trial',
-    trial_ends_at TIMESTAMP NOT NULL DEFAULT now() + INTERVAL '14 days',
-    created_at    TIMESTAMP DEFAULT now()
+    trial_ends_at TIMESTAMPTZ NOT NULL DEFAULT now() + INTERVAL '14 days',
+    created_at    TIMESTAMPTZ DEFAULT now()
 );

@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/google/uuid"
+	"github.com/ronexlemon/bnbcore/internal/domain/tenant"
 	"github.com/ronexlemon/bnbcore/internal/domain/user"
 	"github.com/ronexlemon/bnbcore/internal/infrastructure/db"
 	"github.com/ronexlemon/bnbcore/pkg/helpers"
@@ -115,23 +116,56 @@ func (u *UserRepository)StoreRefreshToken(ctx context.Context,userID uuid.UUID,r
 
 func (u *UserRepository) GetUserByID(ctx context.Context, userID uuid.UUID) (*user.User, error) {
 	var usr user.User
+	var tn tenant.Tenant
+
+	var tenantID *uuid.UUID
+	var tenantTrialEndsAt *time.Time
+	var tenantCreatedAt *time.Time
 
 	err := u.DBConnection.Pool.QueryRow(ctx, `
-		SELECT id, email, role, is_active, created_at
-		FROM users
-		WHERE id = $1
+		SELECT 
+			u.id, u.email, u.role, u.is_active, u.created_at,
+			t.id, t.name, t.subdomain, t.shop_description, t.banner, t.long_description, t.phone_number, t.status, t.trial_ends_at, t.created_at
+		FROM users u
+		LEFT JOIN tenants t ON u.id = t.user_id
+		WHERE u.id = $1
 	`, userID).Scan(
 		&usr.ID,
 		&usr.Email,
 		&usr.Role,
 		&usr.IsActive,
 		&usr.CreatedAt,
+		&tenantID,
+		&tn.ShopName,
+		&tn.Subdomain,
+		&tn.ShopDescription,
+		&tn.Banner,
+		&tn.LongDescription,
+		&tn.PhoneNumber,
+		&tn.Status,
+		&tenantTrialEndsAt,
+		&tenantCreatedAt,
 	)
+
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, errors.New("user not found")
 		}
 		return nil, fmt.Errorf("failed to get user: %w", err)
+	}
+
+	if tenantID != nil {
+		tn.ID = tenantID
+		tn.UserID = usr.ID
+		if tenantTrialEndsAt != nil {
+			tn.TrialEndsAt = *tenantTrialEndsAt
+		}
+		if tenantCreatedAt != nil {
+			tn.CreatedAt = *tenantCreatedAt
+		}
+		usr.Tenant = &tn
+	} else {
+		usr.Tenant = nil
 	}
 
 	return &usr, nil
@@ -140,10 +174,19 @@ func (u *UserRepository) GetUserByID(ctx context.Context, userID uuid.UUID) (*us
 func (u *UserRepository) GetUserByEmail(ctx context.Context, email string) (*user.User, error) {
 	var usr user.User
 
+	var tn tenant.Tenant
+
+	var tenantID *uuid.UUID
+	var tenantTrialEndsAt *time.Time
+	var tenantCreatedAt *time.Time
+
 	err := u.DBConnection.Pool.QueryRow(ctx, `
-		SELECT id, password_hash, email, role, is_active, created_at
-		FROM users
-		WHERE email = $1
+		SELECT 
+			u.id, u.password_hash, u.email, u.role, u.is_active, u.created_at,
+			t.id, t.name, t.subdomain, t.shop_description, t.banner, t.long_description, t.phone_number, t.status, t.trial_ends_at, t.created_at
+		FROM users u
+		LEFT JOIN tenants t ON u.id = t.user_id
+		WHERE u.email = $1
 	`, email).Scan(
 		&usr.ID,
 		&usr.PasswordHash,
@@ -151,12 +194,37 @@ func (u *UserRepository) GetUserByEmail(ctx context.Context, email string) (*use
 		&usr.Role,
 		&usr.IsActive,
 		&usr.CreatedAt,
+		&tenantID,
+		&tn.ShopName,
+		&tn.Subdomain,
+		&tn.ShopDescription,
+		&tn.Banner,
+		&tn.LongDescription,
+		&tn.PhoneNumber,
+		&tn.Status,
+		&tenantTrialEndsAt,
+		&tenantCreatedAt,
 	)
+
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, errors.New("user not found")
 		}
 		return nil, fmt.Errorf("failed to get user: %w", err)
+	}
+
+	if tenantID != nil {
+		tn.ID = tenantID
+		tn.UserID = usr.ID
+		if tenantTrialEndsAt != nil {
+			tn.TrialEndsAt = *tenantTrialEndsAt
+		}
+		if tenantCreatedAt != nil {
+			tn.CreatedAt = *tenantCreatedAt
+		}
+		usr.Tenant = &tn
+	} else {
+		usr.Tenant = nil
 	}
 
 	return &usr, nil
@@ -195,6 +263,7 @@ func (u *UserRepository) GetRefreshToken(ctx context.Context, refreshToken strin
 	err:=u.DBConnection.Pool.QueryRow(ctx,query,refreshToken).Scan(
 		&refresh.ID,
 		&refresh.UserID,
+		&refresh.TokenHash,
 		&refresh.ExpiresAt,
 		&refresh.IsRevoked,
 		&refresh.CreateAt,
@@ -276,14 +345,30 @@ func (u *UserRepository) LoginWithGoogle(ctx context.Context, googleClientID str
 }
 
 func (u *UserRepository) StoreMagicLinkToken(ctx context.Context, userID uuid.UUID, tokenHash string, expiresAt time.Time) error {
-    _, err := u.DBConnection.Pool.Exec(ctx, `
+    tx, err := u.DBConnection.Pool.Begin(ctx)
+    if err != nil {
+        return err
+    }
+    defer tx.Rollback(ctx) 
+
+    _, err = tx.Exec(ctx, `
+        UPDATE magic_link_tokens 
+        SET used = true 
+        WHERE user_id = $1 AND used = false
+    `, userID)
+    if err != nil {
+        return fmt.Errorf("failed to invalidate outstanding user tokens: %w", err)
+    }
+
+    _, err = tx.Exec(ctx, `
         INSERT INTO magic_link_tokens (id, user_id, token_hash, expires_at, used, created_at)
         VALUES (gen_random_uuid(), $1, $2, $3, false, NOW())
     `, userID, tokenHash, expiresAt)
     if err != nil {
         return fmt.Errorf("failed to store magic link token structure: %w", err)
     }
-    return nil
+
+    return tx.Commit(ctx)
 }
 
 
@@ -296,7 +381,7 @@ func (u *UserRepository) FindMagicLinkToken(ctx context.Context, rawToken string
         FROM magic_link_tokens
         WHERE token_hash = $1
           AND used       = false
-          AND expires_at > NOW()
+          AND expires_at > NOW() 
     `, hash).Scan(
         &t.ID,
         &t.UserID,
@@ -313,15 +398,21 @@ func (u *UserRepository) FindMagicLinkToken(ctx context.Context, rawToken string
     }
     return &t, nil
 }
-
 func (u *UserRepository) DeleteMagicLinkToken(ctx context.Context, rawToken string) error {
     hash := helpers.HashToken(rawToken)
 
-    _, err := u.DBConnection.Pool.Exec(ctx, `
-        UPDATE magic_link_tokens SET used = true WHERE token_hash = $1
+    result, err := u.DBConnection.Pool.Exec(ctx, `
+        UPDATE magic_link_tokens 
+        SET used = true 
+        WHERE token_hash = $1 AND used = false -- Strict condition
     `, hash)
     if err != nil {
         return fmt.Errorf("failed to invalidate magic link token: %w", err)
+    }
+
+    // If 0 rows were changed, the token was already consumed concurrently
+    if result.RowsAffected() == 0 {
+        return errors.New("token was already used")
     }
     return nil
 }

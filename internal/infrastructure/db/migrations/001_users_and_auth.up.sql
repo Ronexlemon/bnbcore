@@ -16,8 +16,8 @@ CREATE TABLE users (
     password_hash TEXT NOT NULL,
     role          user_role DEFAULT 'owner',
     is_active     BOOLEAN DEFAULT true,
-    created_at    TIMESTAMP DEFAULT now(),  
-    updated_at    TIMESTAMP DEFAULT now()
+    created_at    TIMESTAMPTZ DEFAULT now(),  
+    updated_at    TIMESTAMPTZ DEFAULT now()
 );
 
 -- -- =========================

@@ -3,14 +3,14 @@ package tenant
 import (
 	"time"
 
-	"github.com/ronexlemon/bnbcore/internal/domain/user"
 	"github.com/google/uuid"
+
 )
 
-type OnboardResult struct {
-	Tenant *Tenant
-	User   *user.User
-}
+// type OnboardResult struct {
+// 	Tenant *Tenant
+// 	User   *user.User
+// }
 
 type TenantStatus string
  
@@ -23,35 +23,35 @@ const TrialDays = 14
 type Tenant struct {
 	ID          *uuid.UUID     `json:"id"`
 	UserID      uuid.UUID   `json:"user_id"`
-	ShopName string `json:"name"`
-	ShopDescription        string       `json:"shop_description"`
-	Subdomain   string       `json:"subdomain"`
+	ShopName *string `json:"name"`
+	ShopDescription        *string       `json:"shop_description"`
+	Subdomain   *string       `json:"subdomain"`
 	Banner *string `json:"banner"`
 	LongDescription *string `json:"long_description"`
-	 PhoneNumber    string         `json:"phone_number"`
-	Status      TenantStatus `json:"status"`
+	 PhoneNumber    *string         `json:"phone_number"`
+	Status      *TenantStatus `json:"status"`
 	TrialEndsAt time.Time    `json:"trial_ends_at"`
 	CreatedAt   time.Time    `json:"created_at"`
 }
 
-type OnboardRequest struct {
-	TenantName string `json:"tenant_name"` 
-	Subdomain  string `json:"subdomain"`   
-}
-type OnboardResponse struct {
-	Tenant      *Tenant      `json:"tenant"`
-	User        *user.User`json:"user"`
-	AccessToken  string      `json:"access_token"`
-	RefreshToken string      `json:"refresh_token"`
-	TokenType    string      `json:"token_type"`
-	ExpiresIn    int64       `json:"expires_in"`
-}
+// type OnboardRequest struct {
+// 	TenantName string `json:"tenant_name"` 
+// 	Subdomain  string `json:"subdomain"`   
+// }
+// type OnboardResponse struct {
+// 	Tenant      *Tenant      `json:"tenant"`
+// 	User        *user.User`json:"user"`
+// 	AccessToken  string      `json:"access_token"`
+// 	RefreshToken string      `json:"refresh_token"`
+// 	TokenType    string      `json:"token_type"`
+// 	ExpiresIn    int64       `json:"expires_in"`
+// }
 type UpdateTenantRequest struct {
 	ShopDescription  *string       `json:"shop_description"`
 	Subdomain *string       `json:"subdomain"`
 	Status    *TenantStatus `json:"status"`
 	Banner *string `json:"banner"`
 	LongDescription *string `json:"long_description"`
-	PhoneNumber    string         `json:"phone_number"`
+	PhoneNumber    *string         `json:"phone_number"`
 	ShopName *string `json:"name"`
 }

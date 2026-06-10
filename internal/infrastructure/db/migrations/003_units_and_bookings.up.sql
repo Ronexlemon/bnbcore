@@ -64,8 +64,8 @@ CREATE TABLE units (
     -- Status
     status              unit_status DEFAULT 'active',
 
-    created_at          TIMESTAMP DEFAULT now(),
-    updated_at          TIMESTAMP DEFAULT now(),
+    created_at         TIMESTAMPTZ DEFAULT now(),
+    updated_at         TIMESTAMPTZ DEFAULT now(),
 
     UNIQUE(tenant_id, slug)
 );
@@ -95,7 +95,7 @@ CREATE TABLE bookings (
     guest_email TEXT,
     guest_phone TEXT,
     guest_number NUMERIC,
-
+    source TEXT,
     start_date DATE NOT NULL,
     end_date DATE NOT NULL,
 

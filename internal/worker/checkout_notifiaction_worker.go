@@ -115,7 +115,7 @@ func (w *CheckoutNotificationWorker) notifyAllParties(ctx context.Context, b *bo
 	 tenant, err := w.tenantService.GetTenantByID(ctx, b.TenantID)
 	if err != nil {
 		log.Printf("Err: failed to resolve tenant phone for tenant %s: %v", b.TenantID, err)
-	} else if tenant.PhoneNumber != "" { 
+	} else if tenant.PhoneNumber != nil { 
 		tenantMsg := fmt.Sprintf(
 			"🔔 Checkout Alert: Guest %s is scheduled to check out of your unit today (Booking ID: %s).",
 			b.GuestName, b.ID,

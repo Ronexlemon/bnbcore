@@ -217,7 +217,7 @@ func (h *TenantHandler) UpdateTenant(w http.ResponseWriter, r *http.Request) {
 				TenantID:  *result.ID,
 				UserID:    *claims.UserID,
 				UserEmail: claims.Email,
-				ShopName:  result.ShopName,
+				ShopName:  *result.ShopName,
 				OccuredAt: time.Now(),
 			},
 			Changes: changes,

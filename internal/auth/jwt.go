@@ -56,7 +56,7 @@ func (m *JwtManager) GenerateTokenPair(userID *uuid.UUID, email, role string) (*
 }
 
 
-func (m *JwtManager) RefreshAccessToken(refreshToken, email, role, subdomain string) (*Claims, string, error) {
+func (m *JwtManager) RefreshAccessToken(refreshToken, email, role string) (*Claims, string, error) {
 	claims, err := m.ValidateToken(refreshToken)
 	if err != nil {
 		return nil, "", err

@@ -96,7 +96,7 @@ tenantID := *t.ID
             StartDate:  result.StartDate,
             EndDate:    result.EndDate,
             TotalPrice: result.TotalPrice,
-            ShopName:   t.ShopDescription,
+            ShopName:   *t.ShopDescription,
             CreatedAt:  result.CreatedAt,
         },
     )
