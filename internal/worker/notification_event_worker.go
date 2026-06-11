@@ -150,16 +150,16 @@ func (w *NotificationWorker) onTenantCreated(ctx context.Context, e eventstream.
 		TenantID: &e.TenantID,
 		UserID:   &e.UserID,
 		Type:     notification.TypeUnitCreated,
-		Title:    "Welcome to BnBCore! 🎉",
+		Title:    "Welcome to HostSasa! 🎉",
 		Message:  fmt.Sprintf("Your shop *%s* has been created. Subdomain: %s", e.ShopName, e.Subdomain),
 		Metadata: map[string]any{"subdomain": e.Subdomain},
 		Email:    e.UserEmail,
-		Subject:  "Welcome to BnBCore — Your shop is ready!",
+		Subject:  "Welcome to HostSasa — Your shop is ready!",
 		Body: senders.BuildHTML(
-			"Welcome to BnBCore!",
+			"Welcome to Hostsasa!",
 			fmt.Sprintf("Hi there! Your shop <b>%s</b> has been created successfully.", e.ShopName),
-			fmt.Sprintf("Your subdomain: <b>%s.bnbcore.com</b><br>You can now start adding your units.", e.Subdomain),
-			"Thank you for choosing BnBCore.",
+			fmt.Sprintf("Your subdomain: <b>%s.hostsasa.app</b><br>You can now start adding your units.", e.Subdomain),
+			"Thank you for choosing HostSasa.",
 		),
 	})
 }
@@ -281,7 +281,7 @@ func (w *NotificationWorker) onSubscriptionCreated(ctx context.Context, e events
 			fmt.Sprintf("Hi! Your <b>%s</b> plan is now active.", e.Plan),
 			fmt.Sprintf("Billing: <b>%s</b><br>Amount: <b>%s %.2f</b><br>Expires: <b>%s</b>",
 				e.BillingCycle, e.Currency, e.Amount, e.ExpiresAt.Format("Jan 02, 2006")),
-			"Thank you for subscribing to BnBCore.",
+			"Thank you for subscribing to HostSasa.",
 		),
 	})
 }

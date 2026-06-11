@@ -4,12 +4,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"time"
 
 	"cloud.google.com/go/auth/credentials/idtoken"
 	"github.com/google/uuid"
 	"github.com/ronexlemon/bnbcore/internal/auth/password"
 	"github.com/ronexlemon/bnbcore/internal/auth/token"
+	"github.com/ronexlemon/bnbcore/internal/infrastructure/queue"
+	"github.com/ronexlemon/bnbcore/internal/worker"
 	"github.com/ronexlemon/bnbcore/pkg/helpers"
 )
 
@@ -18,15 +21,17 @@ type UserService struct{
 	PasswordEngine *password.PasswordHasher
 	TokenEngine    *token.TokenHasher
 	GoogleClientID string
+	Enqueuer  *queue.Enqueuer
 }
 
 
-func NewUserservice(repo UserRepository,passEngine *password.PasswordHasher,tokenEngine *token.TokenHasher,googleClientID string,)(*UserService){
+func NewUserservice(repo UserRepository,passEngine *password.PasswordHasher,tokenEngine *token.TokenHasher,googleClientID string,enqueuer *queue.Enqueuer )(*UserService){
 	return &UserService{
 		Repo: repo,
 		PasswordEngine: passEngine,
 		TokenEngine: tokenEngine,
 		GoogleClientID: googleClientID,
+		Enqueuer: enqueuer,
 	}
 }
 
@@ -163,4 +168,54 @@ func (s *UserService) ValidateMagicLinkToken(ctx context.Context, rawToken strin
     }
 
     return s.Repo.GetUserByID(ctx, record.UserID)
+}
+
+
+func (s *UserService) RequestPasswordReset(ctx context.Context, email, baseURL string) error {
+	usr, err := s.Repo.GetUserByEmail(ctx, email)
+	if err != nil {
+		log.Printf("[user] password reset requested for unknown email: %s", email)
+		return nil
+	}
+
+	rawToken,err := s.CreateMagicLinkToken(ctx,usr.ID)
+	if err !=nil{
+		return  fmt.Errorf("failed to store reset token: %w", err)
+	}
+
+	resetLink := fmt.Sprintf("%s/reset-password?token=%s", baseURL, rawToken)
+
+	if s.Enqueuer != nil {
+		payload := worker.PasswordResetPayload{
+			UserID: usr.ID.String(),
+			Email:  usr.Email,
+			Link:   resetLink,
+		}
+		if _, err := queue.EnqueueTask(ctx, s.Enqueuer, worker.PasswordResetEmailTask, payload); err != nil {
+			log.Printf("[user] failed to enqueue password reset email for %s: %v", usr.Email, err)
+		}
+	}
+
+	return nil
+}
+
+
+func (s *UserService) ResetPassword(ctx context.Context, rawToken, newPassword string) error {
+	record, err := s.Repo.FindMagicLinkToken(ctx, rawToken)
+    if err != nil {
+		return fmt.Errorf("invalid or expired token")
+    }
+	hashedPassword, err := s.PasswordEngine.Hash(newPassword)
+	if err != nil {
+		return fmt.Errorf("failed to hash new password: %w", err)
+	}
+
+	if err := s.Repo.UpdatePasswordHash(ctx, record.UserID, hashedPassword); err != nil {
+		return fmt.Errorf("failed to update password: %w", err)
+	}
+
+	if err := s.Repo.DeleteMagicLinkToken(ctx, rawToken); err != nil {
+        return nil
+    }
+	return nil
 }

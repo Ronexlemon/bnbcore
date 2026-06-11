@@ -16,6 +16,15 @@ type GoogleAuthRequest struct {
     Credential string `json:"credential"`
 }
 
+type RequestPasswordResetRequest struct {
+    Email string `json:"email"`
+}
+
+type ResetPasswordRequest struct {
+    Token       string `json:"token"`
+    NewPassword string `json:"new_password"`
+}
+
 type UserHandler struct {
     Server         *http.ServeMux
     Service        *user.UserService
@@ -55,6 +64,8 @@ h.Server.HandleFunc("POST "+api+"/auth/resend",     metrics.MetricsMiddleware(h.
     h.Server.HandleFunc("POST "+api+"/auth/google", metrics.MetricsMiddleware(h.GoogleAuth)) 
     h.Server.HandleFunc("POST "+api+"/auth/refresh", metrics.MetricsMiddleware(h.RefreshHandler))
     h.Server.HandleFunc("GET "+api+"/users/{id}", metrics.MetricsMiddleware(h.GetUser))
+    h.Server.HandleFunc("POST "+api+"/auth/password-reset/request", metrics.MetricsMiddleware(h.RequestPasswordResetHandler))
+    h.Server.HandleFunc("POST "+api+"/auth/password-reset/confirm", metrics.MetricsMiddleware(h.ResetPasswordHandler))
     h.Server.Handle("GET "+api+"/users/me", h.JWTAuthManager.Authenticate(http.HandlerFunc( metrics.MetricsMiddleware(h.GetMe))))
     h.Server.Handle("PUT "+api+"/users/{id}", h.JWTAuthManager.Authenticate(http.HandlerFunc(metrics.MetricsMiddleware(h.UpdateUser))))
     h.Server.Handle("DELETE "+api+"/users/{id}", h.JWTAuthManager.Authenticate(h.JWTAuthManager.RequireRole("owner")(http.HandlerFunc(metrics.MetricsMiddleware(h.DeleteUser)))))
@@ -83,7 +94,7 @@ func (h *UserHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    link := fmt.Sprintf("%s/auth/verify?token=%s", h.BaseUrl, token)
+    link := fmt.Sprintf("%s/register/verify-email?token=%s", h.BaseUrl, token)
 
     _ = h.Stream.Publish(r.Context(), eventstream.TopicUserSignedUp, usr.ID.String(),
         eventstream.UserSignedUpEvent{
@@ -153,7 +164,7 @@ func (h *UserHandler) ResendVerification(w http.ResponseWriter, r *http.Request)
         return
     }
 
-    link := fmt.Sprintf("%s/auth/verify?token=%s", h.BaseUrl, token)
+    link := fmt.Sprintf("%s/register/verify-email?token=%s", h.BaseUrl, token)
     _ = h.Stream.Publish(r.Context(), eventstream.TopicUserSignedUp, usr.ID.String(),
         eventstream.UserSignedUpEvent{
             UserID:  usr.ID.String(),
@@ -191,7 +202,7 @@ func (h *UserHandler) LoginHandler(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    link := fmt.Sprintf("%s/auth/verify?token=%s", h.BaseUrl, token)
+    link := fmt.Sprintf("%s/register/verify-email?token=%s", h.BaseUrl, token)
     _ = h.Stream.Publish(r.Context(), eventstream.TopicUserSignedUp, userResult.ID.String(),
         eventstream.UserSignedUpEvent{
             UserID:  userResult.ID.String(),
@@ -328,3 +339,52 @@ func (h *UserHandler) issueTokens(w http.ResponseWriter, r *http.Request, usr *u
     })
 }
 
+func (h *UserHandler) RequestPasswordResetHandler(w http.ResponseWriter, r *http.Request) {
+    defer r.Body.Close()
+    
+    var req RequestPasswordResetRequest
+    if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+        http.Error(w, "invalid body format", http.StatusBadRequest)
+        return
+    }
+
+    if req.Email == "" {
+        http.Error(w, "email is required", http.StatusBadRequest)
+        return
+    }
+
+    err := h.Service.RequestPasswordReset(r.Context(), req.Email, h.BaseUrl)
+    if err != nil {
+        http.Error(w, "internal server error", http.StatusInternalServerError)
+        return
+    }
+
+    w.Header().Set("Content-Type", "application/json")
+    w.WriteHeader(http.StatusOK)
+    writeJSON(w, map[string]string{"message": "if the email exists, a reset link has been sent"})
+}
+
+func (h *UserHandler) ResetPasswordHandler(w http.ResponseWriter, r *http.Request) {
+    defer r.Body.Close()
+
+    var req ResetPasswordRequest
+    if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+        http.Error(w, "invalid body format", http.StatusBadRequest)
+        return
+    }
+
+    if req.Token == "" || req.NewPassword == "" {
+        http.Error(w, "token and new_password are required", http.StatusBadRequest)
+        return
+    }
+
+    err := h.Service.ResetPassword(r.Context(), req.Token, req.NewPassword)
+    if err != nil {
+        http.Error(w, err.Error(), http.StatusBadRequest)
+        return
+    }
+
+    w.Header().Set("Content-Type", "application/json")
+    w.WriteHeader(http.StatusOK)
+    writeJSON(w, map[string]string{"message": "password has been successfully updated"})
+}

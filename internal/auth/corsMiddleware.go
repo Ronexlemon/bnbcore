@@ -12,6 +12,7 @@ func CorsMiddleware(next http.Handler) http.Handler {
             "https://www.hostsasa.app":  true,
             "http://localhost:3000":     true,
 			 "http://localhost:4000":     true,
+             "https://hostsasa.vercel.app":     true,
             "http://localhost:5173":     true, 
         }
 

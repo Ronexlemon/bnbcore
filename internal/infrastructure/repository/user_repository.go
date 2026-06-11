@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/google/uuid"
 	"github.com/ronexlemon/bnbcore/internal/domain/tenant"
@@ -17,6 +18,13 @@ import (
 	"google.golang.org/api/idtoken"
 )
 
+
+
+type pgxCommon interface {
+    Exec(ctx context.Context, sql string, arguments ...any) (pgconn.CommandTag, error)
+    Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+    QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+}
 type UserRepository struct{
 	DBConnection *db.PostgresConn
 }
@@ -416,3 +424,4 @@ func (u *UserRepository) DeleteMagicLinkToken(ctx context.Context, rawToken stri
     }
     return nil
 }
+

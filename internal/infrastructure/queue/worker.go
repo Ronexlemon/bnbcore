@@ -23,6 +23,7 @@ func DefaultWorkerConfig() WorkerConfig {
 			"created": 2, // ~14 workers — Twilio template sends
 			"status":  2, // ~14 workers — Twilio status sends
 			"signup":  3, // ~22 workers — SMTP signup emails
+			"pass_reset":2,
 		},
 		StrictPriority:  false,
 		ShutdownTimeout: 30 * time.Second,

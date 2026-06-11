@@ -34,6 +34,12 @@ type UserSignupPayload struct {
 	Link string
 }
 
+type PasswordResetPayload struct {
+	UserID  string
+	Email  string
+	Link string
+}
+
 
 var WhatsAppCreatedTask = queue.TaskDef[BookingCreatedPayload]{
 	Name:    "whatsapp:booking_created",
@@ -56,6 +62,14 @@ var WhatsAppStatusTask = queue.TaskDef[BookingStatusPayload]{
 var UserSignUpTask = queue.TaskDef[UserSignupPayload]{
 	Name:    "user:registration_signup",
 	Queue:   "signup",
+	Retry:   3,
+	Timeout: 10 * time.Second,
+	Unique:  10 * time.Minute,
+}
+
+var PasswordResetEmailTask = queue.TaskDef[PasswordResetPayload]{
+	Name:    "user:password_reset",
+	Queue:   "pass_reset",
 	Retry:   3,
 	Timeout: 10 * time.Second,
 	Unique:  10 * time.Minute,
