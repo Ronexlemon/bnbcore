@@ -147,7 +147,7 @@ func NewMuxService(ctx context.Context) http.Handler {
     
 
      _ = handler.NewTenantHandler(mux, tenant_service, jwtManager,subscription_repo,stream,media)
-     _ = handler.NewUserHandler(mux, user_service, jwtManager,config_env.BASE_DOMAIN,stream,sender)
+     _ = handler.NewUserHandler(mux, user_service, jwtManager,config_env.BASE_APP_URL,stream,sender)
 	 _ = handler.NewUnitHandler(mux, unit_service, jwtManager,subscription_repo,stream,media)
 	 _ = handler.NewBookingHandler(mux, booking_service, jwtManager,stream,subscription_repo)
 	 _ = handler.NewRoomServiceHandler(mux,unit_service_service, jwtManager,subscription_repo,stream)
