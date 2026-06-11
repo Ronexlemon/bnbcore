@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -65,6 +66,9 @@ func (h *TenantHandler) registerHandler() {
 
 	h.Server.Handle("GET "+api+"/tenant/{id}",
 		h.JWTAuthManager.Authenticate(http.HandlerFunc(metrics.MetricsMiddleware(h.GetTenantByID))))
+
+	h.Server.Handle("GET "+api+"/tenant/subdomain-availability",
+		http.HandlerFunc(metrics.MetricsMiddleware(h.CheckSubdomainAvailability)))
 }
 
 func (h *TenantHandler) CreateTenant(w http.ResponseWriter, r *http.Request) {
@@ -100,7 +104,7 @@ userID := *claims.UserID
    _ = h.Stream.Publish(r.Context(), eventstream.TopicTenantCreated, tenant_details.ID.String(),
     eventstream.TenantCreatedEvent{
         BaseEvent: eventstream.BaseEvent{
-            TenantID:  *tenant_details.ID,
+            TenantID:  *tenant_details.Tenant.ID,
             UserID:    userID,
             UserEmail: claims.Email,
             ShopName:  req.ShopName,
@@ -113,6 +117,7 @@ userID := *claims.UserID
 	w.WriteHeader(http.StatusCreated)
 	writeJSON(w, map[string]any{
 		"message": "tenant created successfully",
+		"data":tenant_details,
 	})
 }
 
@@ -230,7 +235,24 @@ func (h *TenantHandler) UpdateTenant(w http.ResponseWriter, r *http.Request) {
 		"data":    result,
 	})
 }
+func (h *TenantHandler) CheckSubdomainAvailability(w http.ResponseWriter, r *http.Request) {
+	subdomain := strings.TrimSpace(r.URL.Query().Get("subdomain"))
+	if subdomain == "" {
+		http.Error(w, "subdomain query parameter is required", http.StatusBadRequest)
+		return
+	}
 
+	exists, err := h.Service.SubdomainExists(r.Context(), subdomain)
+	if err != nil {
+		http.Error(w, "failed to check subdomain availability", http.StatusInternalServerError)
+		return
+	}
+
+	writeJSON(w, map[string]any{
+		"subdomain": subdomain,
+		"available": !exists,
+	})
+}
 func (h *TenantHandler) DeleteTenant(w http.ResponseWriter, r *http.Request) {
 	claims := auth.ClaimsFromContext(r.Context())
 	if claims == nil {

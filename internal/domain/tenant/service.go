@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/google/uuid"
 )
@@ -16,7 +17,7 @@ func NewService(repo Repository) *Service {
 	return &Service{repo: repo}
 }
 
-func (s *Service) CreateTenant(ctx context.Context, shopName,ShopDescription, subdomain,phoneNumber string, userID uuid.UUID,long_Description string) (*Tenant,error) {
+func (s *Service) CreateTenant(ctx context.Context, shopName,ShopDescription, subdomain,phoneNumber string, userID uuid.UUID,long_Description string) (*Owner,error) {
 	exists, err := s.repo.SubdomainExists(ctx, subdomain)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check subdomain: %w", err)
@@ -61,6 +62,10 @@ func (s *Service) UpdateTenant(ctx context.Context, id uuid.UUID, req UpdateTena
 	return s.repo.UpdateTenant(ctx, id, req)
 }
 
+func (s *Service) SubdomainExists(ctx context.Context, subdomain string) (bool, error) {
+	subdomain = strings.ToLower(subdomain)
+	return s.repo.SubdomainExists(ctx, subdomain)
+}
 func (s *Service) DeleteTenant(ctx context.Context, id uuid.UUID) error {
 	return s.repo.DeleteTenant(ctx, id)
 }

@@ -37,7 +37,7 @@ CREATE TABLE platform_settings (
 
 CREATE TABLE tenants (
     id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id       UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    user_id       UUID NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
     name          TEXT NOT NULL,
     subdomain     TEXT UNIQUE NOT NULL,
     shop_description TEXT NOT NULL,

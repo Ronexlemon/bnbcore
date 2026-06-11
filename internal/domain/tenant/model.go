@@ -28,10 +28,23 @@ type Tenant struct {
 	Subdomain   *string       `json:"subdomain"`
 	Banner *string `json:"banner"`
 	LongDescription *string `json:"long_description"`
+	Owner     *Owner   `json:"user"`
 	 PhoneNumber    *string         `json:"phone_number"`
 	Status      *TenantStatus `json:"status"`
 	TrialEndsAt time.Time    `json:"trial_ends_at"`
 	CreatedAt   time.Time    `json:"created_at"`
+}
+
+type Owner struct {
+	ID           uuid.UUID `json:"id"`
+	Email        string  `json:"email"`
+	PasswordHash string  `json:"password_hash"`
+	Password  string `json:"password"`
+	Role         string   `json:"role"`
+	Tenant    *Tenant   `json:"tenant"`
+	IsActive      bool `json:"is_active"`
+	CreatedAt    time.Time `json:"created_at"`
+	
 }
 
 // type OnboardRequest struct {

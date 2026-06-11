@@ -12,6 +12,7 @@ import (
 	"github.com/ronexlemon/bnbcore/internal/infrastructure/db"
 )
 
+var ErrTenantAlreadyExists = errors.New("user already has a tenant")
 type DBQuerier interface {
 	Exec(ctx context.Context, sql string, arguments ...any) (pgconn.CommandTag, error)
 	QueryRow(ctx context.Context, sql string, arguments ...any) pgx.Row
@@ -36,31 +37,49 @@ func NewTenantRepository(dbconnect *db.PostgresConn) (*TenantRepository, error) 
 }
 
 
-
-func (t *TenantRepository) CreateTenant(ctx context.Context, shopName, shopDescription, subdomain ,phoneNumber string, userID uuid.UUID,long_Description string) (*tenant.Tenant, error) {
+func (t *TenantRepository) CreateTenant(ctx context.Context, shopName, shopDescription, subdomain, phoneNumber string, userID uuid.UUID, long_Description string) (*tenant.Owner, error) {
 	var tn tenant.Tenant
+	var owner tenant.Owner
 
 	err := t.DbConnection.Pool.QueryRow(ctx, `
-		INSERT INTO tenants (id, user_id, name, shop_description, subdomain,long_description,phone_number, status, trial_ends_at, created_at)
-		VALUES (gen_random_uuid(), $1, $2, $3, $4, $5,$6,'trial', NOW() + INTERVAL '14 days', NOW())
-		RETURNING id, user_id, name, shop_description, subdomain,phone_number, status, trial_ends_at,long_description, created_at
-	`, userID, shopName, shopDescription, subdomain,long_Description,phoneNumber).Scan(
+		WITH inserted AS (
+			INSERT INTO tenants (id, user_id, name, shop_description, subdomain, long_description, phone_number, status, trial_ends_at, created_at)
+			VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, 'trial', NOW() + INTERVAL '14 days', NOW())
+			RETURNING id, user_id, name, shop_description, subdomain, banner, phone_number, status, trial_ends_at, long_description, created_at
+		)
+		SELECT
+			i.id, i.user_id, i.name, i.shop_description, i.subdomain, i.banner, i.phone_number, i.status, i.trial_ends_at, i.long_description, i.created_at,
+			u.id, u.email, u.role, u.is_active, u.created_at
+		FROM inserted i
+		JOIN users u ON u.id = i.user_id
+	`, userID, shopName, shopDescription, subdomain, long_Description, phoneNumber).Scan(
 		&tn.ID,
 		&tn.UserID,
 		&tn.ShopName,
 		&tn.ShopDescription,
 		&tn.Subdomain,
+		&tn.Banner,
 		&tn.PhoneNumber,
 		&tn.Status,
 		&tn.TrialEndsAt,
 		&tn.LongDescription,
 		&tn.CreatedAt,
+		&owner.ID,
+		&owner.Email,
+		&owner.Role,
+		&owner.IsActive,
+		&owner.CreatedAt,
 	)
 	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+			return nil, ErrTenantAlreadyExists
+		}
 		return nil, fmt.Errorf("failed to create tenant: %w", err)
 	}
+	owner.Tenant = &tn
 
-	return &tn, nil
+	return &owner, nil
 }
 
 
