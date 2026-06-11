@@ -42,6 +42,7 @@ CREATE TABLE tenants (
     subdomain     TEXT UNIQUE NOT NULL,
     shop_description TEXT NOT NULL,
     banner  TEXT ,
+    profile_photo TEXT,
     long_description TEXT,
     phone_number  TEXT,
     status        tenant_status DEFAULT 'trial',

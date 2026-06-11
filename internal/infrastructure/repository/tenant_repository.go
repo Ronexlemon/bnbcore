@@ -87,7 +87,7 @@ func (t *TenantRepository) FindByID(ctx context.Context, id uuid.UUID) (*tenant.
 	var tn tenant.Tenant
 
 	err := t.DbConnection.Pool.QueryRow(ctx, `
-		SELECT id, user_id,name,shop_description, subdomain,phone_number, status,long_description,banner, trial_ends_at, created_at
+		SELECT id, user_id,name,shop_description, subdomain,phone_number, status,long_description,banner,profile_photo, trial_ends_at, created_at
 		FROM tenants
 		WHERE id = $1
 	`, id).Scan(
@@ -100,6 +100,7 @@ func (t *TenantRepository) FindByID(ctx context.Context, id uuid.UUID) (*tenant.
 		&tn.Status,
 		&tn.LongDescription,
 		&tn.Banner,
+		&tn.ProfilePhoto,
 		&tn.TrialEndsAt,
 		&tn.CreatedAt,
 	)
@@ -116,7 +117,7 @@ func (t *TenantRepository) FindByUserID(ctx context.Context, userID uuid.UUID) (
 	var tn tenant.Tenant
 
 	err := t.DbConnection.Pool.QueryRow(ctx, `
-		SELECT id, user_id,name, shop_description, subdomain,phone_number, status,long_description,banner, trial_ends_at, created_at
+		SELECT id, user_id,name, shop_description, subdomain,phone_number, status,long_description,banner,profile_photo, trial_ends_at, created_at
 		FROM tenants
 		WHERE user_id = $1
 	`, userID).Scan(
@@ -129,6 +130,7 @@ func (t *TenantRepository) FindByUserID(ctx context.Context, userID uuid.UUID) (
 		&tn.Status,
 		&tn.LongDescription,
 		&tn.Banner,
+		&tn.ProfilePhoto,
 		&tn.TrialEndsAt,
 		&tn.CreatedAt,
 	)
@@ -145,7 +147,7 @@ func (t *TenantRepository) FindBySubdomain(ctx context.Context, sub string) (*te
 	var tn tenant.Tenant
 
 	err := t.DbConnection.Pool.QueryRow(ctx, `
-		SELECT id, user_id,name, shop_description, subdomain,phone_number, status,long_description,banner, trial_ends_at, created_at
+		SELECT id, user_id,name, shop_description, subdomain,phone_number, status,long_description,banner,profile_photo, trial_ends_at, created_at
 		FROM tenants
 		WHERE subdomain = $1
 	`, sub).Scan(
@@ -158,6 +160,7 @@ func (t *TenantRepository) FindBySubdomain(ctx context.Context, sub string) (*te
 		&tn.Status,
 		&tn.LongDescription,
 		&tn.Banner,
+		&tn.ProfilePhoto,
 		&tn.TrialEndsAt,
 		&tn.CreatedAt,
 	)
@@ -172,7 +175,7 @@ func (t *TenantRepository) FindBySubdomain(ctx context.Context, sub string) (*te
 
 func (t *TenantRepository) GetAll(ctx context.Context) ([]*tenant.Tenant, error) {
 	rows, err := t.DbConnection.Pool.Query(ctx, `
-		SELECT id, user_id,name, shop_description, subdomain,phone_number, status,long_description,banner, trial_ends_at, created_at
+		SELECT id, user_id,name, shop_description, subdomain,phone_number, status,long_description,banner,profile_photo, trial_ends_at, created_at
 		FROM tenants
 		ORDER BY created_at DESC
 	`)
@@ -194,6 +197,7 @@ func (t *TenantRepository) GetAll(ctx context.Context) ([]*tenant.Tenant, error)
 			&tn.Status,
 			&tn.LongDescription,
 			&tn.Banner,
+			&tn.ProfilePhoto,
 			&tn.TrialEndsAt,
 			&tn.CreatedAt,
 		); err != nil {
@@ -205,31 +209,30 @@ func (t *TenantRepository) GetAll(ctx context.Context) ([]*tenant.Tenant, error)
 }
 
 // ── Update ────────────────────────────────────────────────────────────────────
-
 func (t *TenantRepository) UpdateTenant(ctx context.Context, id uuid.UUID, req tenant.UpdateTenantRequest) (*tenant.Tenant, error) {
 	var tn tenant.Tenant
-
 	err := t.DbConnection.Pool.QueryRow(ctx, `
 		UPDATE tenants SET
-			shop_description     = COALESCE($1, shop_description),
-			subdomain = COALESCE($2, subdomain),
-			name = COALESCE($3, name),
-			status    = COALESCE($4, status)
-			phone_number    = COALESCE($5, phone_number)
-			banner    = COALESCE($6, banner )
-			long_description    = COALESCE($7, long_description )
+			shop_description  = COALESCE($1, shop_description),
+			subdomain         = COALESCE($2, subdomain),
+			name              = COALESCE($3, name),
+			phone_number      = COALESCE($4, phone_number),
+			banner            = COALESCE($5, banner),
+			profile_photo     = COALESCE($6, profile_photo),
+			long_description  = COALESCE($7, long_description)
 		WHERE id = $8
-		RETURNING id, user_id,name,shop_description, subdomain,phone_number, status,banner,long_description, trial_ends_at, created_at
-	`, req.ShopDescription, req.Subdomain,req.ShopName ,req.Status,req.PhoneNumber,req.Banner,req.LongDescription, id).Scan(
+		RETURNING id, user_id, name, shop_description, subdomain, phone_number, banner, profile_photo, long_description, status, trial_ends_at, created_at
+	`, req.ShopDescription, req.Subdomain, req.ShopName, req.PhoneNumber, req.Banner, req.ProfilePhoto, req.LongDescription, id).Scan(
 		&tn.ID,
 		&tn.UserID,
 		&tn.ShopName,
 		&tn.ShopDescription,
 		&tn.Subdomain,
 		&tn.PhoneNumber,
-		&tn.Status,
 		&tn.Banner,
+		&tn.ProfilePhoto,
 		&tn.LongDescription,
+		&tn.Status,
 		&tn.TrialEndsAt,
 		&tn.CreatedAt,
 	)
@@ -242,7 +245,35 @@ func (t *TenantRepository) UpdateTenant(ctx context.Context, id uuid.UUID, req t
 	return &tn, nil
 }
 
-
+func (t *TenantRepository) UpdateTenantStatus(ctx context.Context, id uuid.UUID, status tenant.TenantStatus) (*tenant.Tenant, error) {
+	var tn tenant.Tenant
+	err := t.DbConnection.Pool.QueryRow(ctx, `
+		UPDATE tenants SET
+			status = $1
+		WHERE id = $2
+		RETURNING id, user_id, name, shop_description, subdomain, phone_number, banner, profile_photo, long_description, status, trial_ends_at, created_at
+	`, status, id).Scan(
+		&tn.ID,
+		&tn.UserID,
+		&tn.ShopName,
+		&tn.ShopDescription,
+		&tn.Subdomain,
+		&tn.PhoneNumber,
+		&tn.Banner,
+		&tn.ProfilePhoto,
+		&tn.LongDescription,
+		&tn.Status,
+		&tn.TrialEndsAt,
+		&tn.CreatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrTenantNotFound
+		}
+		return nil, fmt.Errorf("failed to update tenant status: %w", err)
+	}
+	return &tn, nil
+}
 func (t *TenantRepository) DeleteTenant(ctx context.Context, id uuid.UUID) error {
 	tag, err := t.DbConnection.Pool.Exec(ctx,
 		`DELETE FROM tenants WHERE id = $1`, id,

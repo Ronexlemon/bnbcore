@@ -27,6 +27,7 @@ type Tenant struct {
 	ShopDescription        *string       `json:"shop_description"`
 	Subdomain   *string       `json:"subdomain"`
 	Banner *string `json:"banner"`
+	ProfilePhoto *string `json:"profile_photo"`
 	LongDescription *string `json:"long_description"`
 	Owner     *Owner   `json:"user"`
 	 PhoneNumber    *string         `json:"phone_number"`
@@ -62,8 +63,8 @@ type Owner struct {
 type UpdateTenantRequest struct {
 	ShopDescription  *string       `json:"shop_description"`
 	Subdomain *string       `json:"subdomain"`
-	Status    *TenantStatus `json:"status"`
 	Banner *string `json:"banner"`
+	ProfilePhoto *string `json:"profile_photo"`
 	LongDescription *string `json:"long_description"`
 	PhoneNumber    *string         `json:"phone_number"`
 	ShopName *string `json:"name"`

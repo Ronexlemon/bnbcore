@@ -11,8 +11,7 @@ type Repository interface {
 	CreateTenant(ctx context.Context, shopName,ShopDescription, subdomain,phoneNumber string, userID uuid.UUID,long_Description string)(*Owner,error)
 	UpdateTenant(ctx context.Context, id uuid.UUID, req UpdateTenantRequest) (*Tenant, error)
 	DeleteTenant(ctx context.Context, id uuid.UUID) error
-
-	
+	UpdateTenantStatus(ctx context.Context, id uuid.UUID, status TenantStatus) (*Tenant, error)
 	FindByID(ctx context.Context, id uuid.UUID) (*Tenant, error)
 	FindByUserID(ctx context.Context, userID uuid.UUID) (*Tenant, error)
 	FindBySubdomain(ctx context.Context, sub string) (*Tenant, error)

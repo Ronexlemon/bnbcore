@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -11,6 +12,7 @@ import (
 	"github.com/ronexlemon/bnbcore/internal/domain/subscription"
 	"github.com/ronexlemon/bnbcore/internal/domain/tenant"
 	"github.com/ronexlemon/bnbcore/internal/eventstream"
+	"github.com/ronexlemon/bnbcore/internal/infrastructure/upload"
 	"github.com/ronexlemon/bnbcore/internal/metrics"
 )
 
@@ -24,21 +26,24 @@ type RegisterTenantRequest struct {
 
 
 
+
 type TenantHandler struct {
 	Server         *http.ServeMux
 	Service        *tenant.Service
 	JWTAuthManager *auth.JwtManager
 	SubRepo        subscription.Repository
-		 Stream         *eventstream.KafkaClient
+    Stream         *eventstream.KafkaClient
+    Media         *upload.MediaService
 }
 
-func NewTenantHandler(server *http.ServeMux, service *tenant.Service, m *auth.JwtManager,sub subscription.Repository,stream *eventstream.KafkaClient) *TenantHandler {
+func NewTenantHandler(server *http.ServeMux, service *tenant.Service, m *auth.JwtManager,sub subscription.Repository,stream *eventstream.KafkaClient,media *upload.MediaService) *TenantHandler {
 	h := &TenantHandler{
 		Server:         server,
 		Service:        service,
 		JWTAuthManager: m,
 		SubRepo: sub,
 		Stream: stream,
+		Media: media,
 	}
 	h.registerHandler()
 	return h
@@ -169,11 +174,14 @@ func (h *TenantHandler) GetTenantByID(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-
 func (h *TenantHandler) UpdateTenant(w http.ResponseWriter, r *http.Request) {
 	claims := auth.ClaimsFromContext(r.Context())
 	if claims == nil {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	if claims.UserID == nil {
+		http.Error(w, "invalid user id", http.StatusBadRequest)
 		return
 	}
 
@@ -183,23 +191,56 @@ func (h *TenantHandler) UpdateTenant(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req tenant.UpdateTenantRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
+	r.Body = http.MaxBytesReader(w, r.Body, 10<<20) // 10MB total — allows up to 2 images
+	if err := r.ParseMultipartForm(10 << 20); err != nil {
+		http.Error(w, "file size too large or malformed form data", http.StatusBadRequest)
 		return
 	}
 
-	var status *tenant.TenantStatus
-	if req.Status != nil {
-		s := tenant.TenantStatus(*req.Status)
-		status = &s
+	req := tenant.UpdateTenantRequest{}
+
+	if v := r.FormValue("shop_description"); v != "" {
+		req.ShopDescription = &v
+	}
+	if v := r.FormValue("subdomain"); v != "" {
+		req.Subdomain = &v
+	}
+	if v := r.FormValue("name"); v != "" {
+		req.ShopName = &v
+	}
+	if v := r.FormValue("phone_number"); v != "" {
+		req.PhoneNumber = &v
+	}
+	if v := r.FormValue("long_description"); v != "" {
+		req.LongDescription = &v
+	}
+	
+
+	// ── Banner upload (optional)
+	if file, header, err := r.FormFile("banner"); err == nil {
+		defer file.Close()
+		cacheKey := fmt.Sprintf("tenant:%s:banner:%s", id.String(), header.Filename)
+		url, uploadErr := h.Media.UploadAndCacheStream(r.Context(), file, cacheKey, "hostsasa")
+		if uploadErr != nil {
+			http.Error(w, fmt.Sprintf("failed to upload banner: %v", uploadErr), http.StatusInternalServerError)
+			return
+		}
+		req.Banner = &url
 	}
 
-	result, err := h.Service.UpdateTenant(r.Context(), id, tenant.UpdateTenantRequest{
-		ShopDescription:  req.ShopDescription,
-		Subdomain: req.Subdomain,
-		Status:    status,
-	})
+	// ── Profile photo upload (optional)
+	if file, header, err := r.FormFile("profile_photo"); err == nil {
+		defer file.Close()
+		cacheKey := fmt.Sprintf("tenant:%s:profile_photo:%s", id.String(), header.Filename)
+		url, uploadErr := h.Media.UploadAndCacheStream(r.Context(), file, cacheKey, "hostsasa")
+		if uploadErr != nil {
+			http.Error(w, fmt.Sprintf("failed to upload profile photo: %v", uploadErr), http.StatusInternalServerError)
+			return
+		}
+		req.ProfilePhoto = &url
+	}
+
+	result, err := h.Service.UpdateTenant(r.Context(), id, req)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -212,8 +253,21 @@ func (h *TenantHandler) UpdateTenant(w http.ResponseWriter, r *http.Request) {
 	if req.Subdomain != nil {
 		changes["subdomain"] = *req.Subdomain
 	}
-	if req.Status != nil {
-		changes["status"] = *req.Status
+	if req.ShopName != nil {
+		changes["name"] = *req.ShopName
+	}
+	if req.PhoneNumber != nil {
+		changes["phone_number"] = *req.PhoneNumber
+	}
+	if req.LongDescription != nil {
+		changes["long_description"] = *req.LongDescription
+	}
+
+	if req.Banner != nil {
+		changes["banner"] = *req.Banner
+	}
+	if req.ProfilePhoto != nil {
+		changes["profile_photo"] = *req.ProfilePhoto
 	}
 
 	_ = h.Stream.Publish(r.Context(), eventstream.TopicTenantUpdated, result.ID.String(),
@@ -226,7 +280,6 @@ func (h *TenantHandler) UpdateTenant(w http.ResponseWriter, r *http.Request) {
 				OccuredAt: time.Now(),
 			},
 			Changes: changes,
-			
 		},
 	)
 
