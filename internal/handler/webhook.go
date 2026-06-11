@@ -138,7 +138,7 @@ func buildReply(action string, b *booking.Booking) string {
 		)
 	case StatusCanceled:
 		return fmt.Sprintf(
-			"❌ Booking cancelled.\nGuest: %s\nID: %s",
+			" Booking cancelled.\nGuest: %s\nID: %s",
 			b.GuestName, b.ID,
 		)
 	default:

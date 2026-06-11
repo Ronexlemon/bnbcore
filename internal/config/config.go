@@ -33,6 +33,7 @@ FROM string
 REDIS_URL string
 CLOUDINARY_URL string
 TEMPLATE_SID string
+REDIS_PASSWORD string
 
 }
 
@@ -76,6 +77,7 @@ func Load() *Config {
 		REDIS_URL:strings.TrimSpace(os.Getenv("REDIS_URL")),
 		CLOUDINARY_URL:strings.TrimSpace(os.Getenv("CLOUDINARY_URL")),
 		TEMPLATE_SID :strings.TrimSpace(os.Getenv("TEMPLATE_SID")),
+		REDIS_PASSWORD :strings.TrimSpace(os.Getenv("REDIS_PASSWORD")),
 		
 
 	}

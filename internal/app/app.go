@@ -23,6 +23,7 @@ import (
 	"github.com/ronexlemon/bnbcore/internal/handler"
 	handlermetric "github.com/ronexlemon/bnbcore/internal/handler/metrics"
 	"github.com/ronexlemon/bnbcore/internal/infrastructure/db"
+	"github.com/ronexlemon/bnbcore/internal/infrastructure/queue"
 	"github.com/ronexlemon/bnbcore/internal/infrastructure/repository"
 	"github.com/ronexlemon/bnbcore/internal/infrastructure/twilio"
 	"github.com/ronexlemon/bnbcore/internal/infrastructure/upload"
@@ -40,9 +41,32 @@ func NewMuxService(ctx context.Context) http.Handler {
     if err != nil {
         log.Fatalf("failed to init event stream: %v", err)
     }
-	redis_client :=config.NewRedisClient(config_env.REDIS_URL)
 
-	media,err := upload.NewMediaService(config_env.CLOUDINARY_URL,redis_client.Client)
+    redisCfg := queue.RedisConfig{
+		URL:      config_env.REDIS_URL,
+		Password: config_env.REDIS_PASSWORD,
+		DB:       0,
+		PoolSize: 20,
+	}
+     redis_client, err := queue.NewRedisClient(redisCfg); 
+     if err != nil {
+		log.Fatalf("failed to connect to Redis: %v", err)
+	}
+	log.Println("Redis connected")
+
+	enqueuer, err := queue.NewEnqueuer(redisCfg)
+	if err != nil {
+		log.Fatalf("failed to create asynq enqueuer: %v", err)
+	}
+	
+
+	asynqWorker, err := queue.NewWorker(redisCfg, queue.DefaultWorkerConfig())
+	if err != nil {
+		log.Fatalf("failed to create asynq worker: %v", err)
+	}
+
+
+	media,err := upload.NewMediaService(config_env.CLOUDINARY_URL,redis_client)
 	if err != nil {
         log.Fatalf("failed to init media : %v", err)
     }
@@ -111,10 +135,10 @@ func NewMuxService(ctx context.Context) http.Handler {
         log.Fatalf("master key and active encryptedHex need needed: %v", err)
     }
 
-   twilio_client:= twilio.NewTwilioClient(twilio.Config{AccountSID: config_env.TWILIO_ACCOUNT_SID,AuthToken: config_env.TWILIO_ACCOUNT_SID,FromNumber: config_env.TWILIO_WHATSAPP_FROM,TemplateSID:config_env.TEMPLATE_SID})
+   twilio_client:= twilio.NewTwilioClient(twilio.Config{AccountSID: config_env.TWILIO_ACCOUNT_SID,AuthToken: config_env.TWILIO_AUTH_TOKEN,FromNumber: config_env.TWILIO_WHATSAPP_FROM,TemplateSID:config_env.TEMPLATE_SID})
 
     tenant_service := tenant.NewService(tenant_repo)
-	 sunscription_service := subscription.NewService(subscription_repo)
+	 subscription_service := subscription.NewService(subscription_repo)
 	 notification_service := notification.NewService(notification_repo)
 	unit_service := unit.NewUnitService(unit_repo)
 	unit_service_service := services.NewService(unit_service_repo)
@@ -127,17 +151,18 @@ func NewMuxService(ctx context.Context) http.Handler {
 	 _ = handler.NewUnitHandler(mux, unit_service, jwtManager,subscription_repo,stream,media)
 	 _ = handler.NewBookingHandler(mux, booking_service, jwtManager,stream,subscription_repo)
 	 _ = handler.NewRoomServiceHandler(mux,unit_service_service, jwtManager,subscription_repo,stream)
-	 _ = handler.NewSubscriptionHandler(mux,sunscription_service, jwtManager,stream)
+	 _ = handler.NewSubscriptionHandler(mux,subscription_service, jwtManager,stream)
 	 _ = handler.NewNotificationHandler(mux,notification_service, jwtManager)
      _=handler.NewTwilioWebhookHandler(handler.Config{TwilioAuthToken: config_env.TWILIO_AUTH_TOKEN},booking_service,new(slog.Logger),mux)
      _=handlermetric.NewMetrics(mux)
 
-	  waWorker := worker.NewBookingNotificationWorker(stream, worker.WhatsAppConfig{
-        AccountSID: config_env.TWILIO_ACCOUNT_SID,
-        AuthToken:  config_env.TWILIO_AUTH_TOKEN,
-        FromNumber: config_env.TWILIO_WHATSAPP_FROM,
-        TemplateSID: config_env.TEMPLATE_SID,
-    },notification_service,twilio_client)
+     whatsappProcessor := worker.NewWhatsAppProcessor(twilio_client, notification_service)
+	whatsappProcessor.Register(asynqWorker.Mux())
+    emailProcessor := worker.NewEmailProcessor(sender,notification_service)
+    emailProcessor.Register(asynqWorker.Mux())
+
+	  waWorker := worker.NewBookingNotificationWorker(stream,notification_service,enqueuer)
+      signupWorker:= worker.NewSignupRegistrationWorker(stream,notification_service,enqueuer)
 	subWorker := worker.NewSubscriptionExpiryWorker(subscription_repo,time.Duration(time.Second *30))
 	generalNotificationWorker := worker.NewNotificationWorker(stream,notification_service,sender)
     checkoutNotificationWorker := worker.NewCheckoutNotificationWorker(booking_service,twilio_client,unit_service_service,tenant_service,100,time.Second*5)
@@ -146,6 +171,17 @@ func NewMuxService(ctx context.Context) http.Handler {
             log.Printf("booking notification worker stopped: %v", err)
         }
     }()
+    go func() {
+        if err := signupWorker.Start(workerCtx); err != nil {
+            log.Printf("signup registration worker stopped: %v", err)
+        }
+    }()
+    go func() {
+		if err := asynqWorker.Run(); err != nil {
+			log.Printf("[app] asynq worker stopped: %v", err)
+		}
+	}()
+    
 	 go func() {
         subWorker.Start(workerCtx)
     }()
@@ -158,7 +194,7 @@ func NewMuxService(ctx context.Context) http.Handler {
     go func() {
        
 		   checkoutNotificationWorker.Start(workerCtx)
-            log.Printf("general notification worker stopped: %v", err)
+            log.Printf("general notification worker running",)
     }()
 
     return auth.CorsMiddleware(auth.SubdomainResolver(tenant_service, config_env.BASE_DOMAIN)(mux))

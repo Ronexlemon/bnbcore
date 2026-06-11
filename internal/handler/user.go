@@ -85,12 +85,15 @@ func (h *UserHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 
     link := fmt.Sprintf("%s/auth/verify?token=%s", h.BaseUrl, token)
 
-    if err := h.EmailSender.Send(senders.EmailPayload{To: usr.Email,Body: link}); err != nil {
-        metrics.VerificationEmailsTotal.WithLabelValues("failure").Inc()
-        http.Error(w, "could not send verification email", http.StatusInternalServerError)
-        return
-    }
-    metrics.MagicLinksIssuedTotal.WithLabelValues("registration").Inc()
+    _ = h.Stream.Publish(r.Context(), eventstream.TopicUserSignedUp, usr.ID.String(),
+        eventstream.UserSignedUpEvent{
+            UserID:  usr.ID.String(),
+            Email:   usr.Email,
+            Name:     usr.Email,
+            SignupLink: link,
+        },
+    )
+
 	metrics.VerificationEmailsTotal.WithLabelValues("success").Inc()
 
 w.Header().Set("Content-Type", "application/json")
@@ -151,11 +154,14 @@ func (h *UserHandler) ResendVerification(w http.ResponseWriter, r *http.Request)
     }
 
     link := fmt.Sprintf("%s/auth/verify?token=%s", h.BaseUrl, token)
-    if err := h.EmailSender.Send(senders.EmailPayload{To: usr.Email,Body: link}); err != nil {
-        metrics.VerificationEmailsTotal.WithLabelValues("failure").Inc()
-        http.Error(w, "could not send verification email", http.StatusInternalServerError)
-        return
-    }
+    _ = h.Stream.Publish(r.Context(), eventstream.TopicUserSignedUp, usr.ID.String(),
+        eventstream.UserSignedUpEvent{
+            UserID:  usr.ID.String(),
+            Email:   usr.Email,
+            Name:     usr.Email,
+            SignupLink: link,
+        },
+    )
 metrics.MagicLinksIssuedTotal.WithLabelValues("resend").Inc()
 	metrics.VerificationEmailsTotal.WithLabelValues("success").Inc()
     w.WriteHeader(http.StatusAccepted)
@@ -186,11 +192,14 @@ func (h *UserHandler) LoginHandler(w http.ResponseWriter, r *http.Request) {
     }
 
     link := fmt.Sprintf("%s/auth/verify?token=%s", h.BaseUrl, token)
-    if err := h.EmailSender.Send(senders.EmailPayload{To: userResult.Email,Body: link}); err != nil {
-        metrics.VerificationEmailsTotal.WithLabelValues("failure").Inc()
-        http.Error(w, "could not send verification email", http.StatusInternalServerError)
-        return
-    }
+    _ = h.Stream.Publish(r.Context(), eventstream.TopicUserSignedUp, userResult.ID.String(),
+        eventstream.UserSignedUpEvent{
+            UserID:  userResult.ID.String(),
+            Email:   userResult.Email,
+            Name:     userResult.Email,
+            SignupLink: link,
+        },
+    )
     metrics.MagicLinksIssuedTotal.WithLabelValues("login_unverified").Inc()
 		metrics.VerificationEmailsTotal.WithLabelValues("success").Inc()
         http.Error(w, "email not verified — check your inbox", http.StatusForbidden)

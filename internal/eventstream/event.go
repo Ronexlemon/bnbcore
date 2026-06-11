@@ -84,3 +84,12 @@ type SubscriptionEvent struct {
 	Currency       string    `json:"currency"`
 	ExpiresAt      time.Time `json:"expires_at"`
 }
+
+
+//signup
+type UserSignedUpEvent struct {
+	UserID    string `json:"user_id"`
+	Email     string `json:"email"`
+	Name      string `json:"name"`
+	SignupLink string `json:"signup_link"`
+}

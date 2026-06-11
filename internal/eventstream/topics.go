@@ -19,4 +19,6 @@ const (
 	TopicSubscriptionExpiring = "subscription.expiring"
 	TopicSubscriptionExpired  = "subscription.expired"
 	TopicSubscriptionCanceled = "subscription.canceled"
+	// User
+	TopicUserSignedUp = "user.signed_up"
 )
