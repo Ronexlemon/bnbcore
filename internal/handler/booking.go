@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/json"
 	"net/http"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/ronexlemon/bnbcore/internal/auth"
@@ -59,6 +60,10 @@ func (h *BookingHandler) registerRoutes() {
 
 	h.Server.Handle("PATCH "+api+"/bookings/{id}/cancel",
 		h.JWTAuthManager.Authenticate(http.HandlerFunc(metrics.MetricsMiddleware(h.CancelBooking))))
+		h.Server.Handle("GET "+api+"/bookings/pending",
+		h.JWTAuthManager.Authenticate(http.HandlerFunc(metrics.MetricsMiddleware(h.GetPendingBookings))))
+	h.Server.Handle("GET "+api+"/dashboard",
+		h.JWTAuthManager.Authenticate(http.HandlerFunc(metrics.MetricsMiddleware(h.GetDashboard))))
 }
 
 func (h *BookingHandler) CreateBooking(w http.ResponseWriter, r *http.Request) {
@@ -343,3 +348,63 @@ func (h *BookingHandler) CheckAvailability(w http.ResponseWriter, r *http.Reques
 	})
 }
 
+func (h *BookingHandler) GetDashboard(w http.ResponseWriter, r *http.Request) {
+	claims := auth.ClaimsFromContext(r.Context())
+	if claims == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	tenant:=tenant.FromContext(r.Context())
+
+	if tenant.ID == nil {
+        http.Error(w,"complete workspace setup first" ,http.StatusPreconditionRequired)
+        return
+    }
+tenantID := *tenant.ID
+
+
+	date := parseDateParam(r, "date", time.Time{})
+	startDate := parseDateParam(r, "start_date", date)
+	endDate := parseDateParam(r, "end_date", startDate)
+
+	summary, err := h.Service.GetDashboardSummary(r.Context(), tenantID, date)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Override occupancy if a custom range was requested
+	if !startDate.IsZero() && !endDate.Equal(date) {
+		occ, err := h.Service.GetUnitOccupancy(r.Context(), tenantID, startDate, endDate)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		summary.UnitOccupancy = occ
+	}
+
+	writeJSON(w,summary)
+}
+
+func (h *BookingHandler) GetPendingBookings(w http.ResponseWriter, r *http.Request) {
+	claims := auth.ClaimsFromContext(r.Context())
+	if claims == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	tenant:=tenant.FromContext(r.Context())
+
+	if tenant.ID == nil {
+        http.Error(w,"complete workspace setup first" ,http.StatusPreconditionRequired)
+        return
+    }
+tenantID := *tenant.ID
+
+	pending, err := h.Service.GetPendingBookings(r.Context(), tenantID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	writeJSON(w, pending)
+}

@@ -6,12 +6,6 @@ import (
 	"github.com/google/uuid"
 )
 
-type CheckType string
-
-const (
-	CheckIn  CheckType = "in"
-	CheckOut CheckType = "out"
-)
 type BookingStatus string
 
 const (
@@ -64,4 +58,14 @@ type UnitOccupancy struct {
 	TotalNights   int       `json:"total_nights"`
 	OccupancyRate float64   `json:"occupancy_rate"` 
 	Revenue       float64   `json:"revenue"`
+}
+
+type DashboardSummary struct {
+	PendingBookings []*Booking          `json:"pending_bookings"`
+	CheckIns        []*Booking          `json:"check_ins"`
+	CheckOuts       []*Booking          `json:"check_outs"`
+	TodayRevenue    float64                     `json:"today_revenue"`
+	LifetimeRevenue float64                     `json:"lifetime_revenue"`
+	TotalGuests     int                         `json:"total_guests_today"`
+	UnitOccupancy   []*UnitOccupancy `json:"unit_occupancy"`
 }

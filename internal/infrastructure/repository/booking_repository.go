@@ -349,34 +349,58 @@ func (b *BookingRepository) GetPendingBookings(ctx context.Context, tenantID uui
 	return bookings, rows.Err()
 }
 
-func (b *BookingRepository) GetCheckEvents(ctx context.Context, tenantID uuid.UUID, date time.Time, checkType booking.CheckType) ([]*booking.Booking, error) {
+func (b *BookingRepository) GetCheckIns(ctx context.Context, tenantID uuid.UUID, date time.Time) ([]*booking.Booking, error) {
 	if date.IsZero() {
 		date = time.Now().UTC()
 	}
 
-	var dateCol string
-	switch checkType {
-	case booking.CheckIn:
-		dateCol = "start_date"
-	case booking.CheckOut:
-		dateCol = "end_date"
-	default:
-		return nil, fmt.Errorf("invalid check type: %s", checkType)
-	}
-
-	query := fmt.Sprintf(`
+	query := `
 		SELECT id, tenant_id, unit_id, guest_name, guest_email, guest_phone,
 		       start_date, end_date, total_price, source, status, guest_number, created_at
 		FROM bookings
 		WHERE tenant_id = $1
 		  AND status = 'confirmed'
-		  AND %s = $2
-		ORDER BY %s ASC
-	`, dateCol, dateCol)
-
+		  AND start_date = $2
+		ORDER BY start_date ASC
+	`
 	rows, err := b.DbConnection.Pool.Query(ctx, query, tenantID, date.Format("2006-01-02"))
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch %s events: %w", checkType, err)
+		return nil, fmt.Errorf("failed to fetch check-ins: %w", err)
+	}
+	defer rows.Close()
+
+	var bookings []*booking.Booking
+	for rows.Next() {
+		var bk booking.Booking
+		if err := rows.Scan(
+			&bk.ID, &bk.TenantID, &bk.UnitID, &bk.GuestName, &bk.GuestEmail, &bk.GuestPhone,
+			&bk.StartDate, &bk.EndDate, &bk.TotalPrice, &bk.Source, &bk.Status, &bk.GuestNumber, &bk.CreatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("failed to scan booking: %w", err)
+		}
+		bookings = append(bookings, &bk)
+	}
+	return bookings, rows.Err()
+}
+
+
+func (b *BookingRepository) GetCheckOuts(ctx context.Context, tenantID uuid.UUID, date time.Time) ([]*booking.Booking, error) {
+	if date.IsZero() {
+		date = time.Now().UTC()
+	}
+
+	query := `
+		SELECT id, tenant_id, unit_id, guest_name, guest_email, guest_phone,
+		       start_date, end_date, total_price, source, status, guest_number, created_at
+		FROM bookings
+		WHERE tenant_id = $1
+		  AND status = 'confirmed'
+		  AND end_date = $2
+		ORDER BY end_date ASC
+	`
+	rows, err := b.DbConnection.Pool.Query(ctx, query, tenantID, date.Format("2006-01-02"))
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch check-outs: %w", err)
 	}
 	defer rows.Close()
 
