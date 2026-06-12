@@ -19,6 +19,9 @@ type GoogleAuthRequest struct {
 type RequestPasswordResetRequest struct {
     Email string `json:"email"`
 }
+type LogoutRequest struct {
+	RefreshToken string `json:"refresh_token"`
+}
 
 type ResetPasswordRequest struct {
     Token       string `json:"token"`
@@ -63,6 +66,7 @@ h.Server.HandleFunc("POST "+api+"/auth/resend",     metrics.MetricsMiddleware(h.
     h.Server.HandleFunc("POST "+api+"/users/login", metrics.MetricsMiddleware(h.LoginHandler))
     h.Server.HandleFunc("POST "+api+"/auth/google", metrics.MetricsMiddleware(h.GoogleAuth)) 
     h.Server.HandleFunc("POST "+api+"/auth/refresh", metrics.MetricsMiddleware(h.RefreshHandler))
+     h.Server.HandleFunc("POST "+api+"/auth/logout", metrics.MetricsMiddleware(h.Logout))
     h.Server.HandleFunc("GET "+api+"/users/{id}", metrics.MetricsMiddleware(h.GetUser))
     h.Server.HandleFunc("POST "+api+"/auth/password-reset/request", metrics.MetricsMiddleware(h.RequestPasswordResetHandler))
     h.Server.HandleFunc("POST "+api+"/auth/password-reset/confirm", metrics.MetricsMiddleware(h.ResetPasswordHandler))
@@ -221,6 +225,25 @@ func (h *UserHandler) LoginHandler(w http.ResponseWriter, r *http.Request) {
     h.issueTokens(w, r, userResult)
 }
 
+func (h *UserHandler) Logout(w http.ResponseWriter, r *http.Request) {
+	var req LogoutRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if req.RefreshToken == "" {
+		http.Error(w, "refresh_token is required", http.StatusBadRequest)
+		return
+	}
+
+	if err := h.Service.Logout(r.Context(), req.RefreshToken); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
 func (h *UserHandler) GoogleAuth(w http.ResponseWriter, r *http.Request) {
     var req GoogleAuthRequest
     if err := json.NewDecoder(r.Body).Decode(&req); err != nil {

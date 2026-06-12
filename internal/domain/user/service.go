@@ -109,6 +109,16 @@ fmt.Println("Pass and email",password,email)
 	return userResult, nil
 
 }
+
+func (s *UserService) Logout(ctx context.Context, refreshToken string) error {
+	hash := helpers.HashToken(refreshToken)
+
+	err := s.Repo.RevokeRefreshToken(ctx, hash)
+	if err != nil {
+		return fmt.Errorf("logout failed: %w", err)
+	}
+	return nil
+}
 func (u *UserService)GetRefreshToken(ctx context.Context, refreshToken string)(*REFRESHTOKEN,error){
 	lookupHash := u.TokenEngine.Hash(refreshToken)
 	

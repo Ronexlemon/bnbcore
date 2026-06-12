@@ -13,6 +13,7 @@ type UserRepository interface{
 	Register(ctx context.Context, email, password string) (*User, error) 
 	Login(ctx context.Context,email,password string)(*User,error)
 	GetRefreshToken(ctx context.Context, refreshToken string)(*REFRESHTOKEN,error)
+	RevokeRefreshToken(ctx context.Context, refreshTokenHash string) error
 	StoreRefreshToken(ctx context.Context,userID uuid.UUID,refreshToken string,createdAt time.Time,isRevoked bool,expiresAt time.Time)error
 	GetUserByID(ctx context.Context,userID uuid.UUID)(*User,error)
 	GetUserByEmail(ctx context.Context,email string)(*User,error)

@@ -121,6 +121,18 @@ func (u *UserRepository)StoreRefreshToken(ctx context.Context,userID uuid.UUID,r
 }
 
 
+func (u *UserRepository) RevokeRefreshToken(ctx context.Context, refreshTokenHash string) error {
+	result, err := u.DBConnection.Pool.Exec(ctx, `
+		UPDATE refresh_tokens SET is_revoked = true WHERE token_hash = $1 AND is_revoked = false
+	`, refreshTokenHash)
+	if err != nil {
+		return fmt.Errorf("failed to revoke refresh token: %w", err)
+	}
+	if result.RowsAffected() == 0 {
+		return errors.New("refresh token not found or already revoked")
+	}
+	return nil
+}
 
 func (u *UserRepository) GetUserByID(ctx context.Context, userID uuid.UUID) (*user.User, error) {
 	var usr user.User
@@ -425,3 +437,4 @@ func (u *UserRepository) DeleteMagicLinkToken(ctx context.Context, rawToken stri
     return nil
 }
 
+var _ user.UserRepository = (*UserRepository)(nil)

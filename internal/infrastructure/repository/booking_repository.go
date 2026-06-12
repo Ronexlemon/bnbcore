@@ -319,4 +319,193 @@ func (b *BookingRepository) FindConfirmedBookingsEndingOnDate(ctx context.Contex
 
     return bookings, nil
 }
+
+func (b *BookingRepository) GetPendingBookings(ctx context.Context, tenantID uuid.UUID) ([]*booking.Booking, error) {
+	query := `
+		SELECT id, tenant_id, unit_id, guest_name, guest_email, guest_phone,
+		       start_date, end_date, total_price, source, status, guest_number, created_at
+		FROM bookings
+		WHERE tenant_id = $1
+		  AND status = 'pending'
+		ORDER BY created_at ASC
+	`
+	rows, err := b.DbConnection.Pool.Query(ctx, query, tenantID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch pending bookings: %w", err)
+	}
+	defer rows.Close()
+
+	var bookings []*booking.Booking
+	for rows.Next() {
+		var bk booking.Booking
+		if err := rows.Scan(
+			&bk.ID, &bk.TenantID, &bk.UnitID, &bk.GuestName, &bk.GuestEmail, &bk.GuestPhone,
+			&bk.StartDate, &bk.EndDate, &bk.TotalPrice, &bk.Source, &bk.Status, &bk.GuestNumber, &bk.CreatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("failed to scan booking: %w", err)
+		}
+		bookings = append(bookings, &bk)
+	}
+	return bookings, rows.Err()
+}
+
+func (b *BookingRepository) GetCheckEvents(ctx context.Context, tenantID uuid.UUID, date time.Time, checkType booking.CheckType) ([]*booking.Booking, error) {
+	if date.IsZero() {
+		date = time.Now().UTC()
+	}
+
+	var dateCol string
+	switch checkType {
+	case booking.CheckIn:
+		dateCol = "start_date"
+	case booking.CheckOut:
+		dateCol = "end_date"
+	default:
+		return nil, fmt.Errorf("invalid check type: %s", checkType)
+	}
+
+	query := fmt.Sprintf(`
+		SELECT id, tenant_id, unit_id, guest_name, guest_email, guest_phone,
+		       start_date, end_date, total_price, source, status, guest_number, created_at
+		FROM bookings
+		WHERE tenant_id = $1
+		  AND status = 'confirmed'
+		  AND %s = $2
+		ORDER BY %s ASC
+	`, dateCol, dateCol)
+
+	rows, err := b.DbConnection.Pool.Query(ctx, query, tenantID, date.Format("2006-01-02"))
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch %s events: %w", checkType, err)
+	}
+	defer rows.Close()
+
+	var bookings []*booking.Booking
+	for rows.Next() {
+		var bk booking.Booking
+		if err := rows.Scan(
+			&bk.ID, &bk.TenantID, &bk.UnitID, &bk.GuestName, &bk.GuestEmail, &bk.GuestPhone,
+			&bk.StartDate, &bk.EndDate, &bk.TotalPrice, &bk.Source, &bk.Status, &bk.GuestNumber, &bk.CreatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("failed to scan booking: %w", err)
+		}
+		bookings = append(bookings, &bk)
+	}
+	return bookings, rows.Err()
+}
+// Pass a zero time.Time to get lifetime revenue.
+func (b *BookingRepository) GetRevenue(ctx context.Context, tenantID uuid.UUID, date time.Time) (float64, error) {
+	var query string
+	var args []interface{}
+
+	args = append(args, tenantID)
+
+	if date.IsZero() {
+		query = `
+			SELECT COALESCE(SUM(total_price), 0)
+			FROM bookings
+			WHERE tenant_id = $1
+			  AND status IN ('confirmed', 'completed')
+		`
+	} else {
+		query = `
+			SELECT COALESCE(SUM(total_price), 0)
+			FROM bookings
+			WHERE tenant_id = $1
+			  AND status IN ('confirmed', 'completed')
+			  AND created_at::date = $2
+		`
+		args = append(args, date.Format("2006-01-02"))
+	}
+
+	var revenue float64
+	err := b.DbConnection.Pool.QueryRow(ctx, query, args...).Scan(&revenue)
+	if err != nil {
+		return 0, fmt.Errorf("failed to calculate revenue: %w", err)
+	}
+	return revenue, nil
+}
+
+// Pass a zero time.Time for lifetime total, or a date to filter by checkout date.
+func (b *BookingRepository) GetTotalGuestsServed(ctx context.Context, tenantID uuid.UUID, date time.Time) (int, error) {
+	var query string
+	var args []interface{}
+
+	args = append(args, tenantID)
+
+	if date.IsZero() {
+		query = `
+			SELECT COALESCE(SUM(guest_number), 0)
+			FROM bookings
+			WHERE tenant_id = $1
+			  AND status IN ('confirmed', 'completed')
+		`
+	} else {
+		query = `
+			SELECT COALESCE(SUM(guest_number), 0)
+			FROM bookings
+			WHERE tenant_id = $1
+			  AND status IN ('confirmed', 'completed')
+			  AND end_date = $2
+		`
+		args = append(args, date.Format("2006-01-02"))
+	}
+
+	var total int
+	err := b.DbConnection.Pool.QueryRow(ctx, query, args...).Scan(&total)
+	if err != nil {
+		return 0, fmt.Errorf("failed to calculate total guests served: %w", err)
+	}
+	return total, nil
+}
+
+func (b *BookingRepository) GetUnitOccupancy(ctx context.Context, tenantID uuid.UUID, startDate, endDate time.Time) ([]*booking.UnitOccupancy, error) {
+	totalNights := int(endDate.Sub(startDate).Hours()/24) + 1
+	if totalNights <= 0 {
+		return nil, fmt.Errorf("invalid date range: endDate must be after startDate")
+	}
+
+	// For each unit, sum the overlap (in nights) between its bookings and [startDate, endDate],
+	// plus revenue from those overlapping bookings.
+	query := `
+		SELECT
+			u.id AS unit_id,
+			COALESCE(SUM(
+				GREATEST(0,
+					(LEAST(b.end_date, $3::date) - GREATEST(b.start_date, $2::date))
+				)
+			), 0) AS booked_nights,
+			COALESCE(SUM(b.total_price), 0) AS revenue
+		FROM units u
+		LEFT JOIN bookings b
+			ON b.unit_id = u.id
+			AND b.tenant_id = u.tenant_id
+			AND b.status IN ('confirmed', 'completed')
+			AND b.start_date < $3::date
+			AND b.end_date   > $2::date
+		WHERE u.tenant_id = $1
+		GROUP BY u.id
+		ORDER BY u.id
+	`
+
+	rows, err := b.DbConnection.Pool.Query(ctx, query, tenantID, startDate.Format("2006-01-02"), endDate.Format("2006-01-02"))
+	if err != nil {
+		return nil, fmt.Errorf("failed to calculate unit occupancy: %w", err)
+	}
+	defer rows.Close()
+
+	var results []*booking.UnitOccupancy
+	for rows.Next() {
+		var o booking.UnitOccupancy
+		if err := rows.Scan(&o.UnitID, &o.BookedNights, &o.Revenue); err != nil {
+			return nil, fmt.Errorf("failed to scan unit occupancy: %w", err)
+		}
+		o.TotalNights = totalNights
+		if totalNights > 0 {
+			o.OccupancyRate = float64(o.BookedNights) / float64(totalNights)
+		}
+		results = append(results, &o)
+	}
+	return results, rows.Err()
+}
 var _ booking.BookingRepository = (*BookingRepository)(nil)
