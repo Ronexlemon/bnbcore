@@ -1,0 +1,54 @@
+# ─── BINARIES AND EXECUTABLES ───
+# Block any locally compiled Go binaries (compiled for your local OS)
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+# If your project builds a specific binary name (e.g., matching your repo name), block it here:
+bin/
+out/
+dist/
+
+# ─── GO BUILD ARTIFACTS & TOOLING ───
+# Block build caches or coverage report profiles
+*.out
+*.test
+*.prof
+cpu.pprof
+mem.pprof
+.testcoverage/
+coverage.txt
+
+# ─── DEPENDENCIES ───
+# If you run 'go mod vendor' locally, you usually don't want to copy it 
+# unless your Dockerfile explicitly relies on -mod=vendor.
+# vendor/
+
+# ─── DEVELOPMENT ENVIRONMENT & SECRETS ───
+# Never let API keys, JWT secrets, or local environment variables leak into the image
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+certs/
+
+# ─── DOCKER INFRASTRUCTURE ───
+# Prevent Docker from copying its own configurations recursively
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# ─── IDE & SYSTEM FILES ───
+# JetBrains / GoLand
+.idea/
+*.iml
+
+# VS Code
+.vscode/
+*.code-workspace
+
+# OS specific files
+.DS_Store
+Thumbs.db
