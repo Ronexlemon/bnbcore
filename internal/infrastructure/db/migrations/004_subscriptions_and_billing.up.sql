@@ -1,5 +1,5 @@
 
-
+CREATE TYPE billing_cycle_type AS ENUM ('monthly', 'yearly', 'weekly', 'quarterly', 'lifetime');
 CREATE TYPE subscription_status AS ENUM (
     'active',
     'trial',

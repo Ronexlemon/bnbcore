@@ -8,10 +8,10 @@ func CorsMiddleware(next http.Handler) http.Handler {
 
         
         allowed := map[string]bool{
-            "https://hostsasa.app":      true,
             "https://www.hostsasa.app":  true,
             "http://localhost:3000":     true,
 			 "http://localhost:4000":     true,
+               "https://hostsasa.app":     true,
              "https://hostsasa.vercel.app":     true,
             "http://localhost:5173":     true, 
         }

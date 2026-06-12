@@ -23,7 +23,7 @@ ON bookings (end_date, status, id);
 -- =========================
 -- SUBSCRIPTION CHECKS
 -- =========================
-CREATE INDEX idx_subscriptions_tenant ON subscriptions(tenant_id);
+CREATE INDEX idx_subscriptions_user ON subscriptions(user_id);
 CREATE INDEX idx_subscriptions_status ON subscriptions(status);
 
 CREATE INDEX idx_magic_link_tokens_token_hash ON magic_link_tokens(token_hash);

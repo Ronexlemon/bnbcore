@@ -176,7 +176,7 @@ func (u *UserRepository) GetUserByID(ctx context.Context, userID uuid.UUID) (*us
 
 	if tenantID != nil {
 		tn.ID = tenantID
-		tn.UserID = usr.ID
+		tn.UserID = &usr.ID
 		if tenantTrialEndsAt != nil {
 			tn.TrialEndsAt = *tenantTrialEndsAt
 		}
@@ -235,7 +235,7 @@ func (u *UserRepository) GetUserByEmail(ctx context.Context, email string) (*use
 
 	if tenantID != nil {
 		tn.ID = tenantID
-		tn.UserID = usr.ID
+		tn.UserID = &usr.ID
 		if tenantTrialEndsAt != nil {
 			tn.TrialEndsAt = *tenantTrialEndsAt
 		}

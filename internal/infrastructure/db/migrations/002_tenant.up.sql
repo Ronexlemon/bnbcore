@@ -44,6 +44,7 @@ CREATE TABLE tenants (
     banner  TEXT ,
     profile_photo TEXT,
     long_description TEXT,
+    socials           JSONB NOT NULL DEFAULT '[]',
     phone_number  TEXT,
     status        tenant_status DEFAULT 'trial',
     trial_ends_at TIMESTAMPTZ NOT NULL DEFAULT now() + INTERVAL '14 days',

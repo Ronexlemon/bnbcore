@@ -45,13 +45,13 @@ func (h *UnitHandler) registerRoutes() {
 
 	protected := func(hf http.HandlerFunc) http.Handler {
 		return h.JWTAuthManager.Authenticate(
-			middleware.RequireActiveSubscription(h.SubRepo)(metrics.MetricsMiddleware(hf)),
+			middleware.RequireActiveOnDirectSubscription(h.SubRepo)(metrics.MetricsMiddleware(hf)),
 		)
 	}
 	
-	h.Server.HandleFunc("GET "+api+"/units", metrics.MetricsMiddleware(h.GetAllUnits))
+	h.Server.Handle("GET "+api+"/units", h.JWTAuthManager.Authenticate(http.HandlerFunc(metrics.MetricsMiddleware(h.GetAllUnits))))
 h.Server.Handle("GET "+api+"/host/units",
-	h.JWTAuthManager.Authenticate(http.HandlerFunc(metrics.MetricsMiddleware(h.GetHostDomainDetails))))
+	metrics.MetricsMiddleware(h.GetHostDomainDetails))
 	h.Server.HandleFunc("GET "+api+"/units/{identifier}", metrics.MetricsMiddleware(h.GetUnitByIdentifier))
 	h.Server.HandleFunc("GET "+api+"/units/{id}/images", metrics.MetricsMiddleware(h.GetUnitImages))
 
@@ -60,7 +60,7 @@ h.Server.Handle("GET "+api+"/host/units",
 
 	h.Server.Handle("PUT "+api+"/units/{id}",protected(h.UpdateUnit))
 
-	h.Server.Handle("DELETE "+api+"/units/{id}",protected((h.DeleteUnit)))
+	h.Server.HandleFunc("DELETE "+api+"/units/{id}",metrics.MetricsMiddleware(h.DeleteUnit))
 
 	h.Server.Handle("POST "+api+"/units/{id}/images",protected(h.AddImage))
 

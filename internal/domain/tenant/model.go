@@ -22,7 +22,7 @@ const (
 const TrialDays = 14
 type Tenant struct {
 	ID          *uuid.UUID     `json:"id"`
-	UserID      uuid.UUID   `json:"user_id"`
+	UserID      *uuid.UUID   `json:"user_id"`
 	ShopName *string `json:"name"`
 	ShopDescription        *string       `json:"shop_description"`
 	Subdomain   *string       `json:"subdomain"`
