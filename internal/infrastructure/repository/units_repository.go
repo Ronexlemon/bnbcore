@@ -225,6 +225,7 @@ func (u *UnitRepository) GetAll(ctx context.Context, tenantID uuid.UUID, limit, 
 
 
 
+
 func (u *UnitRepository) GetUnitByIdAndTenant(ctx context.Context, unitID, tenantID uuid.UUID) (*unit.Unit, error) {
 	query := `
 		SELECT

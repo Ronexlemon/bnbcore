@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/ronexlemon/bnbcore/internal/domain/tenant"
 )
 
 type UnitStatus string
@@ -156,4 +157,9 @@ type UpdateUnitRequest struct {
 	// Contact & status
 	PhoneNumber      *string     `json:"phone_number"`
 	Status           *UnitStatus `json:"status"`
+}
+
+type HostUnitsResult struct {
+	Tenant *tenant.Tenant `json:"tenant"`
+	Units  []*Unit   `json:"units"`
 }

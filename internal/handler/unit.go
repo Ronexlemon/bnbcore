@@ -49,7 +49,9 @@ func (h *UnitHandler) registerRoutes() {
 		)
 	}
 	
-	h.Server.HandleFunc("GET "+api+"/units",metrics.MetricsMiddleware(h.GetAllUnits))
+	h.Server.HandleFunc("GET "+api+"/units", metrics.MetricsMiddleware(h.GetAllUnits))
+h.Server.Handle("GET "+api+"/host/units",
+	h.JWTAuthManager.Authenticate(http.HandlerFunc(metrics.MetricsMiddleware(h.GetHostDomainDetails))))
 	h.Server.HandleFunc("GET "+api+"/units/{identifier}", metrics.MetricsMiddleware(h.GetUnitByIdentifier))
 	h.Server.HandleFunc("GET "+api+"/units/{id}/images", metrics.MetricsMiddleware(h.GetUnitImages))
 
@@ -157,6 +159,49 @@ tenantID := *t.ID
         },
     })
 }
+
+func (h *UnitHandler) GetHostDomainDetails(w http.ResponseWriter, r *http.Request) {
+	t := tenant.FromContext(r.Context())
+	
+	if t == nil {
+		http.Error(w, "tenant not found", http.StatusBadRequest)
+		return
+	}
+
+	if t.ID == nil {
+        http.Error(w,"complete workspace setup first" ,http.StatusPreconditionRequired)
+        return
+    }
+tenantID := *t.ID
+
+    query := r.URL.Query()
+    limit := 10
+    if lStr := query.Get("limit"); lStr != "" {
+        if parsedLimit, err := strconv.Atoi(lStr); err == nil && parsedLimit > 0 {
+            limit = parsedLimit
+        }
+    }
+    offset := 0
+    if oStr := query.Get("offset"); oStr != "" {
+        if parsedOffset, err := strconv.Atoi(oStr); err == nil && parsedOffset >= 0 {
+            offset = parsedOffset
+        }
+    }
+	tenantUnitsDetails, err := h.Service.GetHostUnitsDetails(r.Context(), tenantID,limit,offset)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	writeJSON(w, map[string]any{
+        "data": tenantUnitsDetails,
+        "meta": map[string]int{
+            "limit":  limit,
+            "offset": offset,
+        },
+    })
+}
+
 func (h *UnitHandler) GetUnitImages(w http.ResponseWriter, r *http.Request) {
     unitID, err := uuid.Parse(r.PathValue("id"))
     if err != nil {

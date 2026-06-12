@@ -6,14 +6,16 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
+	"github.com/ronexlemon/bnbcore/internal/domain/tenant"
 )
 
 type UnitService struct {
 	Repo UnitRepository
+	TenantService *tenant.Service
 }
 
-func NewUnitService(repo UnitRepository) *UnitService {
-	return &UnitService{Repo: repo}
+func NewUnitService(repo UnitRepository,tenant_service *tenant.Service) *UnitService {
+	return &UnitService{Repo: repo,TenantService: tenant_service}
 }
 
 func (s *UnitService) CreateUnit(ctx context.Context, tenantID uuid.UUID, req CreateUnitRequest) (*Unit, error) {
@@ -101,6 +103,19 @@ func (s *UnitService) GetUnitBySlugAndTenant(ctx context.Context, slug string, t
 
 func (s *UnitService) GetAllUnits(ctx context.Context, tenantID uuid.UUID, limit, offset int) ([]*Unit, error) {
 	return s.Repo.GetAll(ctx, tenantID, limit, offset)
+}
+func (s *UnitService) GetHostUnitsDetails(ctx context.Context, tenantID uuid.UUID, limit, offset int) (*HostUnitsResult, error) {
+	t, err := s.TenantService.GetTenantByID(ctx, tenantID) 
+	if err != nil {
+		return nil, err
+	}
+
+	units, err := s.Repo.GetAll(ctx, tenantID, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+
+	return &HostUnitsResult{Tenant: t, Units: units}, nil
 }
 
 func (s *UnitService) UpdateUnit(ctx context.Context, id, tenantID uuid.UUID, req UpdateUnitRequest) (*Unit, error) {

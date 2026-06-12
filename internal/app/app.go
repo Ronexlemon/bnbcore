@@ -140,7 +140,7 @@ func NewMuxService(ctx context.Context) http.Handler {
     tenant_service := tenant.NewService(tenant_repo)
 	 subscription_service := subscription.NewService(subscription_repo)
 	 notification_service := notification.NewService(notification_repo)
-	unit_service := unit.NewUnitService(unit_repo)
+	unit_service := unit.NewUnitService(unit_repo,tenant_service)
 	unit_service_service := services.NewService(unit_service_repo)
 	booking_service := booking.NewBookingService(booking_repo)
     user_service := user.NewUserservice(user_repo, passwordEngine, tokenEngine, config_env.GOOGLE_CLIENT_ID,enqueuer)
