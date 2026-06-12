@@ -25,14 +25,14 @@ func NewSubscriptionRepository(dbconn *db.PostgresConn) (*SubscriptionRepository
 func (s *SubscriptionRepository) Create(ctx context.Context, sub *subscription.Subscription) (*subscription.Subscription, error) {
 	err := s.DbConnection.Pool.QueryRow(ctx, `
 		INSERT INTO subscriptions (
-			id, tenant_id, plan, billing_cycle, status, amount, currency,
+			id, user_id, plan, billing_cycle, status, amount, currency,
 			current_period_start, current_period_end, created_at
 		)
 		VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, NOW())
-		RETURNING id, tenant_id, plan, billing_cycle, status, amount, currency,
+		RETURNING id, user_id, plan, billing_cycle, status, amount, currency,
 		          current_period_start, current_period_end, created_at
 	`,
-		sub.TenantID,
+		sub.UserID,
 		sub.Plan,
 		sub.BillingCycle,
 		sub.Status,
@@ -42,7 +42,7 @@ func (s *SubscriptionRepository) Create(ctx context.Context, sub *subscription.S
 		sub.CurrentPeriodEnd,
 	).Scan(
 		&sub.ID,
-		&sub.TenantID,
+		&sub.UserID,
 		&sub.Plan,
 		&sub.BillingCycle,
 		&sub.Status,
@@ -62,13 +62,13 @@ func (s *SubscriptionRepository) GetByID(ctx context.Context, id uuid.UUID) (*su
 	var sub subscription.Subscription
 
 	err := s.DbConnection.Pool.QueryRow(ctx, `
-		SELECT id, tenant_id, plan, billing_cycle, status, amount, currency,
+		SELECT id, user_id, plan, billing_cycle, status, amount, currency,
 		       current_period_start, current_period_end, created_at
 		FROM subscriptions
 		WHERE id = $1
 	`, id).Scan(
 		&sub.ID,
-		&sub.TenantID,
+		&sub.UserID,
 		&sub.Plan,
 		&sub.BillingCycle,
 		&sub.Status,
@@ -87,19 +87,19 @@ func (s *SubscriptionRepository) GetByID(ctx context.Context, id uuid.UUID) (*su
 	return &sub, nil
 }
 
-func (s *SubscriptionRepository) GetByTenantID(ctx context.Context, tenantID uuid.UUID) (*subscription.Subscription, error) {
+func (s *SubscriptionRepository) GetByUserID(ctx context.Context, userID uuid.UUID) (*subscription.Subscription, error) {
 	var sub subscription.Subscription
 
 	err := s.DbConnection.Pool.QueryRow(ctx, `
-		SELECT id, tenant_id, plan, billing_cycle, status, amount, currency,
+		SELECT id, user_id, plan, billing_cycle, status, amount, currency,
 		       current_period_start, current_period_end, created_at
 		FROM subscriptions
-		WHERE tenant_id = $1
+		WHERE user_id = $1
 		ORDER BY created_at DESC
 		LIMIT 1
-	`, tenantID).Scan(
+	`, userID).Scan(
 		&sub.ID,
-		&sub.TenantID,
+		&sub.UserID,
 		&sub.Plan,
 		&sub.BillingCycle,
 		&sub.Status,
@@ -126,11 +126,11 @@ func (s *SubscriptionRepository) Update(ctx context.Context, id uuid.UUID, req s
 			plan          = COALESCE($1, plan),
 			billing_cycle = COALESCE($2, billing_cycle)
 		WHERE id = $3
-		RETURNING id, tenant_id, plan, billing_cycle, status, amount, currency,
+		RETURNING id, user_id, plan, billing_cycle, status, amount, currency,
 		          current_period_start, current_period_end, created_at
 	`, req.Plan, req.BillingCycle, id).Scan(
 		&sub.ID,
-		&sub.TenantID,
+		&sub.UserID,
 		&sub.Plan,
 		&sub.BillingCycle,
 		&sub.Status,
@@ -149,12 +149,12 @@ func (s *SubscriptionRepository) Update(ctx context.Context, id uuid.UUID, req s
 	return &sub, nil
 }
 
-func (s *SubscriptionRepository) Cancel(ctx context.Context, id, tenantID uuid.UUID) error {
+func (s *SubscriptionRepository) Cancel(ctx context.Context, id, userID uuid.UUID) error {
 	tag, err := s.DbConnection.Pool.Exec(ctx, `
 		UPDATE subscriptions SET status = 'canceled'
-		WHERE id = $1 AND tenant_id = $2
+		WHERE id = $1 AND user_id = $2
 		  AND status NOT IN ('canceled', 'expired')
-	`, id, tenantID)
+	`, id, userID)
 	if err != nil {
 		return fmt.Errorf("failed to cancel subscription: %w", err)
 	}
@@ -179,7 +179,7 @@ func (s *SubscriptionRepository) UpdateStatus(ctx context.Context, id uuid.UUID,
 
 func (s *SubscriptionRepository) GetExpired(ctx context.Context) ([]*subscription.Subscription, error) {
 	rows, err := s.DbConnection.Pool.Query(ctx, `
-		SELECT id, tenant_id, plan, billing_cycle, status, amount, currency,
+		SELECT id, user_id, plan, billing_cycle, status, amount, currency,
 		       current_period_start, current_period_end, created_at
 		FROM subscriptions
 		WHERE status IN ('active', 'trial')
@@ -195,7 +195,7 @@ func (s *SubscriptionRepository) GetExpired(ctx context.Context) ([]*subscriptio
 		var sub subscription.Subscription
 		if err := rows.Scan(
 			&sub.ID,
-			&sub.TenantID,
+			&sub.UserID,
 			&sub.Plan,
 			&sub.BillingCycle,
 			&sub.Status,
@@ -212,16 +212,16 @@ func (s *SubscriptionRepository) GetExpired(ctx context.Context) ([]*subscriptio
 	return subs, nil
 }
 
-func (s *SubscriptionRepository) IsActive(ctx context.Context, tenantID uuid.UUID) (bool, error) {
+func (s *SubscriptionRepository) IsActive(ctx context.Context, userID uuid.UUID) (bool, error) {
 	var active bool
 	err := s.DbConnection.Pool.QueryRow(ctx, `
 		SELECT EXISTS (
 			SELECT 1 FROM subscriptions
-			WHERE tenant_id = $1
+			WHERE user_id = $1
 			  AND status IN ('active', 'trial')
 			  AND current_period_end > NOW()
 		)
-	`, tenantID).Scan(&active)
+	`, userID).Scan(&active)
 	if err != nil {
 		return false, fmt.Errorf("failed to check subscription: %w", err)
 	}

@@ -17,7 +17,7 @@ func NewService(repo Repository) *Service {
 	return &Service{Repo: repo}
 }
 
-func (s *Service) Subscribe(ctx context.Context, tenantID uuid.UUID, req CreateSubscriptionRequest) (*Subscription, error) {
+func (s *Service) Subscribe(ctx context.Context, userID uuid.UUID, req CreateSubscriptionRequest) (*Subscription, error) {
 	if req.Plan == "" {
 		return nil, errors.New("plan is required")
 	}
@@ -25,10 +25,9 @@ func (s *Service) Subscribe(ctx context.Context, tenantID uuid.UUID, req CreateS
 		return nil, errors.New("billing_cycle must be 'monthly' or 'yearly'")
 	}
 
-	// Check existing active subscription
-	existing, err := s.Repo.GetByTenantID(ctx, tenantID)
+	existing, err := s.Repo.GetByUserID(ctx, userID)
 	if err == nil && existing != nil && existing.Status == StatusActive {
-		return nil, errors.New("tenant already has an active subscription, upgrade or cancel first")
+		return nil, errors.New("user already has an active subscription, upgrade or cancel first")
 	}
 
 	price, ok := PlanPricing[req.Plan][req.BillingCycle]
@@ -36,7 +35,6 @@ func (s *Service) Subscribe(ctx context.Context, tenantID uuid.UUID, req CreateS
 		return nil, fmt.Errorf("invalid plan or billing cycle")
 	}
 
-	
 	now := time.Now()
 	var periodEnd time.Time
 	switch req.BillingCycle {
@@ -47,7 +45,7 @@ func (s *Service) Subscribe(ctx context.Context, tenantID uuid.UUID, req CreateS
 	}
 
 	sub := &Subscription{
-		TenantID:           tenantID,
+		UserID:             userID,
 		Plan:               req.Plan,
 		BillingCycle:       req.BillingCycle,
 		Status:             StatusActive,
@@ -60,24 +58,22 @@ func (s *Service) Subscribe(ctx context.Context, tenantID uuid.UUID, req CreateS
 	return s.Repo.Create(ctx, sub)
 }
 
-func (s *Service) GetMySubscription(ctx context.Context, tenantID uuid.UUID) (*Subscription, error) {
-	return s.Repo.GetByTenantID(ctx, tenantID)
+func (s *Service) GetMySubscription(ctx context.Context, userID uuid.UUID) (*Subscription, error) {
+	return s.Repo.GetByUserID(ctx, userID)
 }
 
 func (s *Service) GetSubscriptionByID(ctx context.Context, id uuid.UUID) (*Subscription, error) {
 	return s.Repo.GetByID(ctx, id)
 }
 
-func (s *Service) Upgrade(ctx context.Context, tenantID uuid.UUID, req UpdateSubscriptionRequest) (*Subscription, error) {
-	existing, err := s.Repo.GetByTenantID(ctx, tenantID)
+func (s *Service) Upgrade(ctx context.Context, userID uuid.UUID, req UpdateSubscriptionRequest) (*Subscription, error) {
+	existing, err := s.Repo.GetByUserID(ctx, userID)
 	if err != nil {
 		return nil, fmt.Errorf("no active subscription found: %w", err)
 	}
 
-	// Recalculate amount if plan or cycle changed
 	plan := existing.Plan
 	cycle := existing.BillingCycle
-
 	if req.Plan != nil {
 		plan = *req.Plan
 	}
@@ -95,16 +91,15 @@ func (s *Service) Upgrade(ctx context.Context, tenantID uuid.UUID, req UpdateSub
 		return nil, err
 	}
 	updated.Amount = price
-
 	return updated, nil
 }
 
-func (s *Service) Cancel(ctx context.Context, tenantID uuid.UUID) error {
-	existing, err := s.Repo.GetByTenantID(ctx, tenantID)
+func (s *Service) Cancel(ctx context.Context, userID uuid.UUID) error {
+	existing, err := s.Repo.GetByUserID(ctx, userID)
 	if err != nil {
 		return fmt.Errorf("no subscription found: %w", err)
 	}
-	return s.Repo.Cancel(ctx, existing.ID, tenantID)
+	return s.Repo.Cancel(ctx, existing.ID, userID)
 }
 
 // GetPlans returns available plans and pricing for the frontend

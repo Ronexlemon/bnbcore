@@ -6,7 +6,6 @@ import (
 
 	"github.com/ronexlemon/bnbcore/internal/auth"
 	"github.com/ronexlemon/bnbcore/internal/domain/subscription"
-	"github.com/ronexlemon/bnbcore/internal/domain/tenant"
 	"github.com/ronexlemon/bnbcore/internal/eventstream"
 	"github.com/ronexlemon/bnbcore/internal/metrics"
 )
@@ -15,15 +14,15 @@ type SubscriptionHandler struct {
 	Server         *http.ServeMux
 	Service        *subscription.Service
 	JWTAuthManager *auth.JwtManager
-	 Stream         *eventstream.KafkaClient
+	Stream         *eventstream.KafkaClient
 }
 
-func NewSubscriptionHandler(server *http.ServeMux, service *subscription.Service, m *auth.JwtManager,stream  *eventstream.KafkaClient ) *SubscriptionHandler {
+func NewSubscriptionHandler(server *http.ServeMux, service *subscription.Service, m *auth.JwtManager, stream *eventstream.KafkaClient) *SubscriptionHandler {
 	h := &SubscriptionHandler{
 		Server:         server,
 		Service:        service,
 		JWTAuthManager: m,
-		Stream: stream,
+		Stream:         stream,
 	}
 	h.registerRoutes()
 	return h
@@ -32,10 +31,10 @@ func NewSubscriptionHandler(server *http.ServeMux, service *subscription.Service
 func (h *SubscriptionHandler) registerRoutes() {
 	api := "/api/v1"
 
-	// Public — show plans before login
+	
 	h.Server.HandleFunc("GET "+api+"/subscriptions/plans", metrics.MetricsMiddleware(h.GetPlans))
 
-	// Protected
+	
 	h.Server.Handle("POST "+api+"/subscriptions",
 		h.JWTAuthManager.Authenticate(http.HandlerFunc(metrics.MetricsMiddleware(h.Subscribe))))
 
@@ -49,14 +48,12 @@ func (h *SubscriptionHandler) registerRoutes() {
 		h.JWTAuthManager.Authenticate(http.HandlerFunc(metrics.MetricsMiddleware(h.Cancel))))
 }
 
-
 func (h *SubscriptionHandler) GetPlans(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, map[string]any{
 		"currency": "KES",
 		"plans":    h.Service.GetPlans(),
 	})
 }
-
 
 func (h *SubscriptionHandler) Subscribe(w http.ResponseWriter, r *http.Request) {
 	claims := auth.ClaimsFromContext(r.Context())
@@ -71,16 +68,7 @@ func (h *SubscriptionHandler) Subscribe(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	tenant := tenant.FromContext(r.Context())
-	if tenant.ID ==nil{
-		 http.Error(w,"complete workspace setup first" ,http.StatusPreconditionRequired)
-        return
-
-	}
-
-	tenantID :=*tenant.ID
-
-	result, err := h.Service.Subscribe(r.Context(), tenantID, req)
+	result, err := h.Service.Subscribe(r.Context(), *claims.UserID, req)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -100,17 +88,7 @@ func (h *SubscriptionHandler) GetMySubscription(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	tenant := tenant.FromContext(r.Context())
-	if tenant.ID ==nil{
-		 http.Error(w,"complete workspace setup first" ,http.StatusPreconditionRequired)
-        return
-
-	}
-
-	tenantID :=*tenant.ID
-
-
-	result, err := h.Service.GetMySubscription(r.Context(), tenantID)
+	result, err := h.Service.GetMySubscription(r.Context(), *claims.UserID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
@@ -118,7 +96,6 @@ func (h *SubscriptionHandler) GetMySubscription(w http.ResponseWriter, r *http.R
 
 	writeJSON(w, map[string]any{"data": result})
 }
-
 
 func (h *SubscriptionHandler) Upgrade(w http.ResponseWriter, r *http.Request) {
 	claims := auth.ClaimsFromContext(r.Context())
@@ -133,17 +110,7 @@ func (h *SubscriptionHandler) Upgrade(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tenant := tenant.FromContext(r.Context())
-	if tenant.ID ==nil{
-		 http.Error(w,"complete workspace setup first" ,http.StatusPreconditionRequired)
-        return
-
-	}
-
-	tenantID :=*tenant.ID
-
-
-	result, err := h.Service.Upgrade(r.Context(), tenantID, req)
+	result, err := h.Service.Upgrade(r.Context(), *claims.UserID, req)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -155,7 +122,6 @@ func (h *SubscriptionHandler) Upgrade(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-
 func (h *SubscriptionHandler) Cancel(w http.ResponseWriter, r *http.Request) {
 	claims := auth.ClaimsFromContext(r.Context())
 	if claims == nil {
@@ -163,17 +129,7 @@ func (h *SubscriptionHandler) Cancel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tenant := tenant.FromContext(r.Context())
-	if tenant.ID ==nil{
-		 http.Error(w,"complete workspace setup first" ,http.StatusPreconditionRequired)
-        return
-
-	}
-
-	tenantID :=*tenant.ID
-
-
-	if err := h.Service.Cancel(r.Context(), tenantID); err != nil {
+	if err := h.Service.Cancel(r.Context(), *claims.UserID); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}

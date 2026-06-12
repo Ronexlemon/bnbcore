@@ -26,7 +26,7 @@ func (w *SubscriptionExpiryWorker) Start(ctx context.Context) {
 	ticker := time.NewTicker(w.Interval)
 	defer ticker.Stop()
 
-	// Run immediately on start then on every tick
+
 	w.run(ctx)
 
 	for {
@@ -59,6 +59,6 @@ func (w *SubscriptionExpiryWorker) run(ctx context.Context) {
 			log.Printf("failed to expire subscription %s: %v", sub.ID, err)
 			continue
 		}
-		log.Printf("subscription %s for tenant %s marked as expired", sub.ID, sub.TenantID)
+		log.Printf("subscription %s for tenant %s marked as expired", sub.ID, sub.UserID)
 	}
 }

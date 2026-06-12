@@ -19,15 +19,16 @@ CREATE TYPE plan_type AS ENUM (
 
 CREATE TABLE subscriptions (
     id                   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id            UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    user_id              UUID NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
     plan                 plan_type NOT NULL,
     status               subscription_status DEFAULT 'trial',
-    amount               NUMERIC NOT NULL,
+    amount               NUMERIC(10,2) NOT NULL,
     currency             TEXT DEFAULT 'KES',
-    billing_cycle TEXT NOT NULL DEFAULT 'monthly',
+    billing_cycle        billing_cycle_type NOT NULL DEFAULT 'monthly',
     current_period_start TIMESTAMPTZ,
     current_period_end   TIMESTAMPTZ,
-    created_at           TIMESTAMPTZ DEFAULT now()
+    created_at           TIMESTAMPTZ DEFAULT now(),
+    updated_at           TIMESTAMPTZ DEFAULT now()
 );
 
 -- =========================

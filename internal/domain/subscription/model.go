@@ -42,7 +42,7 @@ var PlanPricing = map[PlanType]map[BillingCycle]float64{
 
 type Subscription struct {
 	ID                 uuid.UUID
-	TenantID           uuid.UUID
+	UserID           uuid.UUID
 	Plan               PlanType
 	BillingCycle       BillingCycle
 	Status             Status
