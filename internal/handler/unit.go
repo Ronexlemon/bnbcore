@@ -50,8 +50,7 @@ func (h *UnitHandler) registerRoutes() {
 	}
 	
 	h.Server.Handle("GET "+api+"/units", h.JWTAuthManager.Authenticate(http.HandlerFunc(metrics.MetricsMiddleware(h.GetAllUnits))))
-h.Server.Handle("GET "+api+"/host/units",
-	metrics.MetricsMiddleware(h.GetHostDomainDetails))
+h.Server.Handle("GET "+api+"/host/units",metrics.MetricsMiddleware(h.GetHostDomainDetails))
 	h.Server.HandleFunc("GET "+api+"/units/{identifier}", metrics.MetricsMiddleware(h.GetUnitByIdentifier))
 	h.Server.HandleFunc("GET "+api+"/units/{id}/images", metrics.MetricsMiddleware(h.GetUnitImages))
 
@@ -98,7 +97,7 @@ tenantID := *tenant.ID
 	_ = h.Stream.Publish(r.Context(), eventstream.TopicUnitCreated, result.ID.String(),
     eventstream.UnitCreatedEvent{
         BaseEvent: eventstream.BaseEvent{
-            TenantID:  *tenant.ID,
+            TenantID:  tenantID,
             UserID:    *claims.UserID,
             UserEmail: claims.Email,
             OccuredAt: time.Now(),
@@ -106,6 +105,7 @@ tenantID := *tenant.ID
         Title: result.Title,
 		ShopName: result.Name,
 		Location: result.Location,
+		TenantID: tenantID,
 
 
     },

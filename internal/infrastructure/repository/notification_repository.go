@@ -26,6 +26,12 @@ func NewNotificationRepository(dbconn *db.PostgresConn) (*NotificationRepository
 }
 
 func (r *NotificationRepository) Create(ctx context.Context, n *notification.Notification) (*notification.Notification, error) {
+	if *n.TenantID == uuid.Nil {
+		return nil, fmt.Errorf("tenant_id is required")
+	}
+	if *n.UserID == uuid.Nil {
+		return nil, fmt.Errorf("user_id is required")
+	}
 	metadata, err := json.Marshal(n.Metadata)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal metadata: %w", err)
